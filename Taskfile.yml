@@ -1,0 +1,93 @@
+version: '3'
+
+# eggokit 是一个纯 Go 库，不产出可执行文件，所以没有交叉编译、版本注入、发布产物那几类任务
+# 门禁（verify）就是它唯一的对外质量承诺：依赖整洁、格式统一、静态检查通过、单测全绿、竞态干净
+
+vars:
+  # l10n 工具的四个位置参数：消息函数所在包、扫描目录、内嵌翻译表所在的 HTML 源、语言文件目录
+  # 库自带文案集中在 logger 与 updater，本库没有 HTML 页面，故不传 --html
+  # 这些语言文件是随库发布的"附加语言层"，下游通过 l10n.Options.ExtraLayers 叠加
+  L10N_ARGS: '--pkg github.com/jy-eggroll/eggokit/l10n --src logger,updater --dir locales'
+
+tasks:
+  default:
+    desc: Run all verification checks
+    cmds:
+      - task: verify
+
+  # mod-tidy 与 mod-tidy:check 是一对：前者整理依赖，后者只校验不修改
+  # 门禁刻意使用 -diff 而不是直接执行 tidy：直接执行只会就地改掉 go.mod，
+  # 检查本身永远不会失败，形同虚设
+  mod-tidy:
+    desc: 整理 Go 模块依赖 (go mod tidy)
+    cmds:
+      - go mod tidy
+
+  mod-tidy:check:
+    desc: 校验 go.mod/go.sum 已整理（只读，不修改文件）
+    cmds:
+      - go mod tidy -diff
+
+  fmt:check:
+    desc: Check Go source formatting
+    cmds:
+      - |
+        unformatted="$(gofmt -l $(git ls-files --cached --others --exclude-standard '*.go'))"
+        if [ -n "$unformatted" ]; then
+          printf '以下 Go 文件未通过 gofmt 检查：\n%s\n' "$unformatted" >&2
+          exit 1
+        fi
+
+  # fmt 是 fmt:check 的修复动作，仅用于本地，不纳入 verify
+  # 与 fmt:check 使用同一份文件集（受版本控制的 Go 文件），避免两处标准不一致
+  fmt:
+    desc: 格式化 Go 代码 (gofmt)
+    cmds:
+      - gofmt -w $(git ls-files --cached --others --exclude-standard '*.go')
+
+  # l10n:check 是语言文件的只读门禁：校验默认语言文件与源码一致、语言文件均已按字典序
+  # 排列且能被 go-i18n 正常解析、译文没有失效条目
+  l10n:check:
+    desc: 校验语言文件（与源码一致、已排序、可被 go-i18n 解析、无失效译文）
+    cmds:
+      - go run ./l10n/cmd/l10n check {{.L10N_ARGS}}
+
+  # l10n:export 是 l10n:check 的修复动作：重新生成默认语言文件、重排译文文件，
+  # 并打印待翻译清单与失效译文清单（源码中已删除但译文里还留着的条目，需人工删除）
+  l10n:export:
+    desc: 重新生成语言文件（覆盖 en.json、重排译文、打印待翻译/失效译文清单）
+    cmds:
+      - go run ./l10n/cmd/l10n export {{.L10N_ARGS}}
+
+  vet:
+    desc: Run go vet
+    cmds:
+      - go vet ./...
+
+  test:
+    desc: Run all Go tests without cached results
+    cmds:
+      - go test ./... -count=1
+
+  # 库里有 l10n 的全局快照与 updater 的并发下载，竞态检测必须有
+  test:race:
+    desc: Run all Go tests with the race detector
+    cmds:
+      - go test -race ./... -count=1
+
+  verify:
+    desc: Run all verification checks
+    # 验证项顺序执行，保证失败时立即停止且日志归属清晰
+    # 依赖整理排在最前：go.mod/go.sum 与源码不一致时，后续检查的结论都不可信
+    cmds:
+      - task: mod-tidy:check
+      - task: fmt:check
+      - task: vet
+      - task: l10n:check
+      - task: test
+      - task: test:race
+
+  clean:
+    desc: Remove build artifacts
+    cmds:
+      - rm -rf build/

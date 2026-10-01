@@ -1,0 +1,33 @@
+name: Continuous Integration
+
+on:
+    # 库不产出二进制，没有「留可下载产物」的需求，PR 与推送执行同一套校验即可
+    pull_request: {}
+    push:
+        branches:
+            - "**"
+
+# 校验全程只读仓库，权限维持最小
+permissions:
+    contents: read
+
+jobs:
+    verify:
+        runs-on: ubuntu-latest
+        steps:
+            - uses: actions/checkout@v4
+
+            - uses: actions/setup-go@v5
+              with:
+                  # go.mod 里声明了 go 1.26，交给 setup-go 依据它挑选工具链，避免两处版本漂移
+                  go-version-file: go.mod
+                  cache: true
+
+            - name: Install Task
+              uses: arduino/setup-task@v2
+              with:
+                  version: 3.x
+                  repo-token: ${{ secrets.GITHUB_TOKEN }}
+
+            - name: Verify
+              run: task verify
