@@ -1,0 +1,197 @@
+# 可复用工作流：把各项目的 ci / package / publish 中逐字重复的构建发布流程收敛到一处
+#
+# 前因：每个项目原先都各自抄一遍 checkout / setup-go / setup-task / 取版本 / 取构建时间 /
+# verify / build-all / changelog / 建 Release / 上传产物，四个文件里同一段逻辑出现三遍，
+# 修一次要改三个仓库。此处把公共部分抽出，调用方只保留各自的「触发条件」与「权限」，
+# 差异通过下面的 inputs 表达
+#
+# 该文件只声明 workflow_call，不会被 push / PR 等事件直接触发
+#
+# 调用方契约（本工作流依赖调用方提供这三个 Taskfile 任务，不直接调用任何构建命令）：
+#   task verify      —— 完整校验，失败即中止，不产出任何二进制
+#   task build-all   —— 全平台构建，产物落在 build/（本工作流按 build/* 上传与发布）
+#   task changelog   —— 生成发布说明到 stdout，接 VERSION、TYPE(dev/release) 与可选的 NOTES_LANG
+#                       NOTES_LANG 为空串时必须**不传**语言参数，让项目自己的默认语言生效
+#                       （刻意不叫 LANG：那是系统区域变量，撞名会连带影响该步骤里其它命令的 locale）
+# 这样约定而不直接写死 eggokit 的命令行，是为了让本工作流与具体构建方式解耦：
+# 调用方换构建工具、换语言都不必改这里，只需让那三个任务存在
+#
+# 引用方式：调用方用 `uses: Jy-EggRoll/eggokit/.github/workflows/go-release.yml@main`
+name: Go Release
+
+on:
+    workflow_call:
+        inputs:
+            # 投递方式，决定「校验之后做什么」，四种取值与三个调用方的路径一一对应
+            # verify-only：只跑校验，不构建、不上传        —— 对应 ci 的 PR 路径
+            # artifact   ：校验 + 全平台构建 + 上传产物      —— 对应 ci 的 push 路径、package 的手动运行
+            # prerelease ：校验 + 构建 + dev 更新日志 + 开发预发布 —— 对应 package 的 tag 路径
+            # release    ：校验 + 构建 + 更新日志 + 正式发布   —— 对应 publish
+            mode:
+                description: '投递方式：verify-only / artifact / prerelease / release'
+                required: true
+                type: string
+
+            # 程序名，用于拼装 Release 标题（"<app> v<版本>"）。必须与 release.json 里的 app 一致
+            app:
+                description: '程序名，用于 Release 标题（如 flk、ggt）'
+                required: true
+                type: string
+
+            # 版本号来源，决定二进制内嵌版本号与产物名所用的版本串
+            # tag           ：取触发本次运行的标签名            —— package 的 tag 路径、publish
+            # timestamp     ：形如 2026-10-01-12-00-00          —— ci 的 push 路径
+            # dev-timestamp ：形如 dev-20261001-120000          —— package 的手动运行
+            # 三者格式刻意保留差异：这是各项目改造前既有的取版本逻辑，统一会改变产物名与内嵌版本号
+            version_source:
+                description: '版本号来源：tag / timestamp / dev-timestamp'
+                required: false
+                type: string
+                default: 'tag'
+
+            # 产物名称前缀，最终产物名 = 前缀 + 版本号
+            # 各项目既有差异（如 flk- 与 binaries-）必须原样保留，否则历史产物名会变
+            artifact_prefix:
+                description: '上传产物的名称前缀（产物名 = 前缀 + 版本号）'
+                required: false
+                type: string
+                default: 'binaries-'
+
+            # 产物保留天数：分支构建通常只留几天，发布产物留得更久，由调用方各自传入
+            retention_days:
+                description: '产物保留天数'
+                required: false
+                type: number
+                default: 3
+
+            # 发布说明的语言，留空表示用项目自己的默认（release.json 的 releaseNotesLang，
+            # 再退到内置默认 en）。留空是常态；需要某一次发布临时用另一种语言时（例如对外
+            # 正式发版想用英文、日常预发布用中文），在调用方工作流里传这一个值即可
+            changelog_lang:
+                description: '发布说明语言（如 en / zh-CN）；留空用项目默认'
+                required: false
+                type: string
+                default: ''
+
+jobs:
+    build:
+        # 刻意不在此声明 permissions：可复用工作流拿到的令牌权限始终以调用方为上限，
+        # 调用方已各自保留原样（校验类只读、发布类写），因此这里实际权限与各项目原先完全一致
+        runs-on: ubuntu-latest
+        steps:
+            - name: Checkout code
+              uses: actions/checkout@v4
+              with:
+                  # 取全量历史与所有标签：changelog 依赖 git tag 列表，浅克隆看不到历史标签
+                  fetch-depth: 0
+
+            - name: Setup Go
+              uses: actions/setup-go@v5
+              with:
+                  # 始终以调用方的 go.mod 为 Go 版本的唯一来源，避免工作流与项目配置漂移
+                  go-version-file: go.mod
+                  cache: true
+
+            - name: Setup Task
+              uses: go-task/setup-task@v2
+              with:
+                  # setup-task 的版本号在此收敛为唯一一处，杜绝各文件各写一遍而漂移
+                  version: 3.x
+
+            # 取版本号：三种来源逐字复刻各项目改造前的逻辑，仅做分支选择
+            # 用 env 传入而非直接内插到脚本里，避免输入被当作 shell 代码执行
+            - name: Get version
+              if: inputs.mode != 'verify-only'
+              id: get_version
+              env:
+                  VERSION_SOURCE: ${{ inputs.version_source }}
+              run: |
+                  case "$VERSION_SOURCE" in
+                    tag)
+                      VERSION=${GITHUB_REF#refs/tags/}
+                      ;;
+                    timestamp)
+                      VERSION=$(date '+%Y-%m-%d-%H-%M-%S')
+                      ;;
+                    dev-timestamp)
+                      VERSION="dev-$(date +%Y%m%d-%H%M%S)"
+                      ;;
+                    *)
+                      echo "未知的 version_source：$VERSION_SOURCE" >&2
+                      exit 1
+                      ;;
+                  esac
+                  echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+
+            # 构建时间只被 build-all 消费，verify-only 模式下没有消费者，因而同样跳过
+            - name: Get build time
+              if: inputs.mode != 'verify-only'
+              id: get_build_time
+              run: |
+                  BUILDTIME=$(date -u +%Y-%m-%dT%H:%M:%SZ)
+                  echo "buildtime=$BUILDTIME" >> "$GITHUB_OUTPUT"
+
+            # 先验证再构建：验证失败时不会产出任何可执行文件，避免把有问题的二进制交到手上
+            - name: Verify source
+              run: task verify
+
+            - name: Build binaries for all platforms
+              if: inputs.mode != 'verify-only'
+              run: task build-all
+              env:
+                  VERSION: ${{ steps.get_version.outputs.version }}
+                  BUILDTIME: ${{ steps.get_build_time.outputs.buildtime }}
+
+            # dev 版更新日志：TYPE=dev 会加入开发版警告与版本信息，并把 tag 匹配放宽到任意标签
+            # 版本号经 env 传入而非内插进脚本文本：tag 名是外部输入，直接拼进命令行等于把它
+            # 当作 shell 代码执行（标签名允许的字符集里含分号等元字符），跨仓库复用的工作流尤须防这一层
+            - name: Generate release notes (dev)
+              if: inputs.mode == 'prerelease'
+              env:
+                  VERSION: ${{ steps.get_version.outputs.version }}
+                  CHANGELOG_LANG: ${{ inputs.changelog_lang }}
+              run: task changelog VERSION="$VERSION" TYPE=dev NOTES_LANG="$CHANGELOG_LANG" > release_notes.md
+
+            # 正式版更新日志：TYPE 走 Taskfile 默认值 release，只匹配 semver 标签并附带 CHANGELOG 摘要
+            - name: Generate release notes
+              if: inputs.mode == 'release'
+              env:
+                  VERSION: ${{ steps.get_version.outputs.version }}
+                  CHANGELOG_LANG: ${{ inputs.changelog_lang }}
+              run: task changelog VERSION="$VERSION" NOTES_LANG="$CHANGELOG_LANG" > release_notes.md
+
+            - name: Create development release
+              if: inputs.mode == 'prerelease'
+              uses: softprops/action-gh-release@v2
+              with:
+                  tag_name: ${{ steps.get_version.outputs.version }}
+                  name: "${{ inputs.app }} v${{ steps.get_version.outputs.version }} (开发版)"
+                  body_path: release_notes.md
+                  files: |
+                      build/*
+                  draft: false
+                  prerelease: true
+              env:
+                  GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+            - name: Create GitHub Release
+              if: inputs.mode == 'release'
+              uses: softprops/action-gh-release@v2
+              with:
+                  tag_name: ${{ steps.get_version.outputs.version }}
+                  name: "${{ inputs.app }} v${{ steps.get_version.outputs.version }}"
+                  body_path: release_notes.md
+                  files: |
+                      build/*
+                  draft: false
+                  prerelease: false
+              env:
+                  GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+            - name: Upload build artifacts
+              if: inputs.mode != 'verify-only'
+              uses: actions/upload-artifact@v4
+              with:
+                  name: ${{ inputs.artifact_prefix }}${{ steps.get_version.outputs.version }}
+                  path: build/*
+                  retention-days: ${{ inputs.retention_days }}

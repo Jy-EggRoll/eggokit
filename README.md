@@ -12,8 +12,25 @@ eggokit 是 [Jy-EggRoll](https://github.com/Jy-EggRoll) 的 Go 通用基础库�
 | `atomicfile` | 原子写文件：同目录临时文件 + 落盘 + rename，避免写入中途失败留下半截文件 |
 | `logger` | 基于标准库 `log/slog` 的分级日志，级别可运行时切换，供诊断与审计使用 |
 | `updater` | 自升级：查询 GitHub Release、下载并校验 SHA-256 摘要、跨平台替换可执行文件（含 Windows 原地改名交接） |
+| `release` | 发版工具链的公共部分：发布清单（平台列表与产物命名）与两个命令 `buildall`、`changelog` |
 
 各包的具体约定写在各自的包注释里，改代码前先读那里。
+
+## 发版工具
+
+`release/cmd` 下有两个命令，把各项目重复了几遍的「发版」逻辑收敛成一份实现，统一读同一份
+`release.json`（即 `release.Manifest`），因此「有哪些平台」「产物叫什么名字」只有一处真源：
+
+```bash
+# 按清单交叉编译全部平台，产物落在 build/
+go run github.com/jy-eggroll/eggokit/release/cmd/buildall --manifest release.json --version 1.2.3
+
+# 生成发布说明并输出到 stdout（可直接作为 GitHub Release 正文）
+go run github.com/jy-eggroll/eggokit/release/cmd/changelog --manifest release.json --version 1.2.3 --type release
+```
+
+两个命令默认以中文输出（另有 `--lang en` 可切换），其文案与 `logger`、`updater` 一样随库发布，
+下游通过 `ExtraLayers` 即可获得译文。
 
 ## 库自带的译文怎么用
 

@@ -5,9 +5,9 @@ version: '3'
 
 vars:
   # l10n 工具的四个位置参数：消息函数所在包、扫描目录、内嵌翻译表所在的 HTML 源、语言文件目录
-  # 库自带文案集中在 logger 与 updater，本库没有 HTML 页面，故不传 --html
+  # 库自带文案集中在 logger、updater 与 release（构建/发布说明命令），本库没有 HTML 页面，故不传 --html
   # 这些语言文件是随库发布的"附加语言层"，下游通过 l10n.Options.ExtraLayers 叠加
-  L10N_ARGS: '--pkg github.com/jy-eggroll/eggokit/l10n --src logger,updater --dir locales'
+  L10N_ARGS: '--pkg github.com/jy-eggroll/eggokit/l10n --src logger,updater,release --dir locales'
 
 tasks:
   default:
