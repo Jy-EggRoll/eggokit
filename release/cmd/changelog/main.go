@@ -113,7 +113,13 @@ func run(args []string, stdout, stderr io.Writer) int {
 
 	// 分支与提交短哈希只在 dev 版展示，且都是尽力而为：取不到就省略整行，绝不因此失败
 	if *typeFlag == typeDev {
+		// 分支名在 CI 里其实取不到：checkout 之后是 detached HEAD，`--abbrev-ref` 只会
+		// 返回字面量 "HEAD"，而那不是任何一个分支名。当作空处理，交给渲染层省略整行，
+		// 否则每条 dev 发布说明上都会挂一句毫无信息量的「分支: HEAD」（实测踩过）
 		opts.Branch = gitOutputBestEffort(*root, "rev-parse", "--abbrev-ref", "HEAD")
+		if opts.Branch == "HEAD" {
+			opts.Branch = ""
+		}
 		opts.Commit = gitOutputBestEffort(*root, "rev-parse", "--short", "HEAD")
 	}
 

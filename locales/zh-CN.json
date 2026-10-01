@@ -95,7 +95,7 @@
   "The manifest must declare at least one platform": "清单必须声明至少一个平台",
   "The release provides no SHA-256 digest; integrity could not be verified": "该 Release 未提供 SHA-256 摘要，未能校验完整性",
   "The upgrade target is empty": "升级目标为空",
-  "This is a development build intended for testing only; it may contain unstable or experimental features, please use it with caution": "这是一个开发版本，仅供测试使用。请谨慎使用，可能包含不稳定或实验性功能",
+  "This is a development build intended for testing only; it may contain unstable or experimental features, please use it with caution": "这是一个开发版本，仅供测试使用。请谨慎使用，可能包含不稳定或实验性功能。",
   "Unsupported": "不支持",
   "Unsupported --log-level {{.Level}}; expected one of trace, debug, info, warn, error": "不支持的 --log-level {{.Level}}，只接受 trace、debug、info、warn、error",
   "Unsupported --type {{.Type}}; only dev and release are accepted": "不支持的 --type {{.Type}}，只接受 dev 与 release",
