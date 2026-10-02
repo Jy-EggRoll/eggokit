@@ -12,8 +12,10 @@
 //
 // 缺失译文时逐级回退：先走 go-i18n 的语言匹配链（精确匹配 → 同语种的地区变体 →
 // bundle 的默认语言），最终落到源串本身，因此**永远不会返回空串或裸 key**——
-// 最差的表现只是"这句回退成了源串"，不会更糟。注意因此当默认语言不是英文、
-// 或存在多门受支持语言时，漏翻也可能显示成另一门语言，而不一定是英文。
+// 最差的表现只是"这句回退成了源串"，不会更糟。回退时 data 仍会被填进占位符
+// （见 renderSource），所以带模板变量的消息在回退时依然是可读的一句话。
+// 注意因此当默认语言不是英文、或存在多门受支持语言时，漏翻也可能显示成另一门语言，
+// 而不一定是英文。
 //
 // 并发契约（支持运行期切换语言）：
 //   - Init 必须在任何 T()/Current()/Supported()/SetLanguage 之前完成，且全进程只调用一次：
@@ -24,7 +26,7 @@
 //   - 切换语言的可见性是即时的：SetLanguage 返回之后，任何新的 T() 都按新语言输出；
 //     已在执行中的 T() 不受影响（它读的是自己那份快照）
 //   - Init 失败时状态保持原样而不是被清空：宁可维持上一个可用状态（可能是"从未 Init"），
-//     也不要留下半套状态；从未 Init 过时 T 安全回退源串而不是 panic
+//     也不要留下半套状态；从未 Init 过时 T 安全回退到渲染后的源串而不是 panic
 package l10n
 
 import (
@@ -32,6 +34,7 @@ import (
 	"errors"
 	"fmt"
 	"strings"
+	"sync"
 	"sync/atomic"
 
 	goi18n "github.com/nicksnyder/go-i18n/v2/i18n"
@@ -63,8 +66,44 @@ type snapshot struct {
 	supported []string
 }
 
-// state 是包级状态。nil（零值）代表"尚未 Init 成功"，此时 T 回退源串而不是 panic
+// state 是包级状态。nil（零值）代表"尚未 Init 成功"，此时 T 走 renderSource 回退而不是 panic
 var state atomic.Pointer[snapshot]
+
+// sourceLocalizer 是「没有可用译文」时渲染源串用的翻译器，懒加载
+//
+// 为什么不直接返回 msg、也不自己替换占位符：占位符语法由 go-i18n（text/template）定义，
+// 自己写一份替换就是同一份知识的第二个实现，迟早与主路径漂移；而直接返回 msg 会让带
+// 占位符的消息原样吐出 "{{.URL}}" 这种不可读的文本。复用同一条渲染管线，
+// 「回退成源串」才能对调用方始终是一句可用的话
+//
+// 绝大多数进程会在使用 T 之前 Init，因此这个 bundle 通常不会被创建
+var (
+	sourceOnce      sync.Once
+	sourceLocalizer *goi18n.Localizer
+)
+
+// renderSource 把 data 填进源串的占位符，返回一句可用的回退文案
+//
+// data 为 nil 时原样返回：没有变量可填，而模板渲染反而多一层风险——
+// 消息里合法的 "{{" 会被当成模板语法，解析失败虽会落回原串，但那是白做一次尝试
+func renderSource(msg string, data map[string]any) string {
+	if data == nil {
+		return msg
+	}
+	sourceOnce.Do(func() {
+		sourceLocalizer = goi18n.NewLocalizer(goi18n.NewBundle(language.English), "en")
+	})
+	out, err := sourceLocalizer.Localize(&goi18n.LocalizeConfig{
+		MessageID:      msg,
+		DefaultMessage: &goi18n.Message{ID: msg, Other: msg},
+		TemplateData:   data,
+		TemplateParser: missingKeyErrorParser,
+	})
+	if err != nil || out == "" {
+		return msg
+	}
+	return out
+}
 
 // Init 按 opts 加载语言文件并建立当前语言的翻译器，失败时返回 error。
 //
@@ -166,7 +205,8 @@ func SetLanguage(lang string) error {
 // T 返回 msg 在当前语言下的译文，data 是模板变量（可为 nil）。
 //
 // msg 既是原文也是消息 id。查不到译文时逐级回落，最终落到 DefaultMessage（即 msg
-// 本身），所以本函数**永远不会返回空串或裸 key**，最差情况就是返回源串。
+// 本身），所以本函数**永远不会返回空串或裸 key**，最差情况就是返回渲染后的源串
+// （data 仍会被填进占位符，见 renderSource）。
 //
 // 注意这里不看 error：go-i18n 在消息缺失时仍然返回兜底文本并附带非 nil error
 // （见 go-i18n 的 localizer.go），以 error 为准会把"正常的回退"误判成失败。
@@ -174,8 +214,8 @@ func T(msg string, data map[string]any) string {
 	// 快照只读一次：同一次调用内的语言必须自洽，不可在查询中途再读（否则可能换语言）
 	snap := state.Load()
 	if snap == nil || snap.localizer == nil {
-		// Init 未调用或从未成功：返回源串而不是 panic，保证任何调用路径都不会崩
-		return msg
+		// Init 未调用或从未成功：回退到渲染后的源串而不是 panic，保证任何调用路径都不会崩
+		return renderSource(msg, data)
 	}
 	out, _ := snap.localizer.Localize(&goi18n.LocalizeConfig{
 		MessageID: msg,
@@ -186,8 +226,8 @@ func T(msg string, data map[string]any) string {
 		TemplateParser: missingKeyErrorParser,
 	})
 	if out == "" {
-		// 模板渲染失败等异常情况，同样回落源串
-		return msg
+		// 模板渲染失败等异常情况，同样回落到渲染后的源串
+		return renderSource(msg, data)
 	}
 	return out
 }

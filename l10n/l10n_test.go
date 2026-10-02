@@ -213,6 +213,22 @@ func TestTranslateBeforeInit(t *testing.T) {
 	}
 }
 
+// TestTranslateBeforeInitRendersTemplateData 断言未初始化时源串里的占位符仍会被填上
+//
+// 守的是回退路径的可用性：直接返回源串会让带模板变量的消息吐出 "{{.URL}}" 这种不可读
+// 文本，而调用方恰恰无从判断自己是不是漏了 Init——库的使用者从未 Init 是常见情形
+func TestTranslateBeforeInitRendersTemplateData(t *testing.T) {
+	saved := state.Load()
+	state.Store(nil)
+	defer func() { state.Store(saved) }()
+
+	got := T("Service started: {{.URL}}", map[string]any{"URL": "http://127.0.0.1:8999/"})
+	want := "Service started: http://127.0.0.1:8999/"
+	if got != want {
+		t.Errorf("未初始化时源串的占位符应被填上，实得 %q，期望 %q", got, want)
+	}
+}
+
 // countingFS 包装一个文件系统并统计读取次数，用于证明「语言文件只在 Init 时解析一次」。
 //
 // 为什么需要把读取次数变成可断言的量：SetLanguage 若偷偷重新 ParseMessageFileBytes，
