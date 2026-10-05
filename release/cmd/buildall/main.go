@@ -272,7 +272,7 @@ func buildOne(root, output, ldflagsPkg, pkg, version, buildTime string, p releas
 
 // ldflagsString 拼出注入版本信息所用的 -ldflags 取值
 //
-// 单独成函数以便单测钉死其形态：这段字符串是"版本号真的进到二进制里"的关键，
+// 单独成函数以便单测固定其形态：这段字符串是"版本号真的进到二进制里"的关键，
 // 少一个 -X、包路径拼错、缺空格，都不会让构建报错，只会让版本号静默停留在零值
 func ldflagsString(ldflagsPkg, version, buildTime string) string {
 	return fmt.Sprintf("-s -w -X %s.Version=%s -X %s.BuildTime=%s", ldflagsPkg, version, ldflagsPkg, buildTime)

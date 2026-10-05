@@ -202,7 +202,7 @@ func TestAuthDisabledNoToken(t *testing.T) {
 //
 // 防的回归：静态资源一律放行，如果首页文件能被它自己的真实文件名取到，
 // token 门禁就被完全绕过——首页里往往被调用方注入了运行期状态，这条旁路一旦成立，
-// 日后任何「往首页塞数据」的改动都会同时变成「无凭据可读」
+// 日后任何「往首页写数据」的改动都会同时变成「无凭据可读」
 // 自定义 IndexName 也单独守一条：规则必须跟着配置走，而不是写死 index.html
 func TestIndexNamePathIsRejected(t *testing.T) {
 	server := newTestServer(t, func(cfg *Config) {

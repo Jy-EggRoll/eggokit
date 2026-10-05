@@ -286,7 +286,7 @@ func FormatSize(bytes int64) string {
 	}
 }
 
-// FormatDuration 输出秒级或分秒级时长，分钟以上才拆出分钟段，避免出现无意义的 0m 前缀
+// FormatDuration 输出秒级或分秒级时长，分钟以上才分出分钟段，避免出现无意义的 0m 前缀
 // 该函数同时用于传输耗时与界面上的剩余时间展示
 func FormatDuration(d time.Duration) string {
 	if d >= time.Minute {

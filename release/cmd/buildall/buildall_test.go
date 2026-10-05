@@ -14,7 +14,7 @@ import (
 )
 
 // TestPlanBuilds 锁定"清单 -> 产物名与落点"这一步
-// 产物名必须与升级器匹配的命名完全一致，因此在脱离真实编译的层面单独钉死
+// 产物名必须与升级器匹配的命名完全一致，因此在脱离真实编译的层面单独固定
 func TestPlanBuilds(t *testing.T) {
 	m := &release.Manifest{
 		App:         "ggt",
@@ -188,7 +188,7 @@ func TestRunManifestMissing(t *testing.T) {
 
 // TestBuildAllSmoke 是唯一的真实编译用例：在一个临时模块上跑通完整构建
 // 只构建宿主机平台，既保证产物可执行以便校验版本注入，又把耗时压到最短
-// 用 testing.Short 兜底，需要跳过时可用 go test -short
+// 用 testing.Short 作为回退，需要跳过时可用 go test -short
 //
 // main 包刻意放在 cmd/hello 而非项目根：这样必须靠 --package ./cmd/hello 才能构建成功，
 // 若该参数没有真正传给 go build（退回固定构建根目录的旧行为），构建会因"根目录没有 main 包"而失败——

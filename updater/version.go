@@ -29,7 +29,7 @@ type Version struct {
 
 // ParseVersion 解析版本标签原文
 // ok 为 false 表示标签不符合任何受支持形态，调用方必须显式跳过该标签
-// 这里刻意不返回零值版本兜底：把解析失败当作 0.0.0.dev.0 会让无关标签（如 latest、v1）被误判成一个真实的开发版并参与比较
+// 这里刻意不返回零值版本作为回退：把解析失败当作 0.0.0.dev.0 会让无关标签（如 latest、v1）被误判成一个真实的开发版并参与比较
 func ParseVersion(raw string) (Version, bool) {
 	trimmed := strings.TrimPrefix(raw, "v")
 

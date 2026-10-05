@@ -63,7 +63,7 @@ func TestLogLevelFromString(t *testing.T) {
 // 回归背景：设置文件的 logLevel 项在注册表里以 DefaultLevelText() 为默认值，
 // 而真正生效的默认级别来自 DefaultConfig()。两处若不一致，下游的设置命令会显示
 // 一个从未生效过的默认值，用户按它去理解日志行为必然被误导，
-// 而这种偏差在功能测试里完全看不出来，只能靠这条断言钉住
+// 而这种偏差在功能测试里完全看不出来，只能靠这条断言固定
 func TestDefaultLevelTextMatchesDefaultConfig(t *testing.T) {
 	parsed, err := LogLevelFromString(DefaultLevelText())
 	if err != nil {

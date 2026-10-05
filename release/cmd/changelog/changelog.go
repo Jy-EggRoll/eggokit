@@ -12,7 +12,7 @@ import (
 )
 
 // 发布说明的两种类型
-// 用常量而不是裸字符串：这两个取值会出现在 flag 校验、分支判断与展示文案里，
+// 用常量而不是直接写字符串：这两个取值会出现在 flag 校验、分支判断与展示文案里，
 // 各写一遍字面量迟早会有一处拼错，而拼错的后果是静默走到错误分支
 const (
 	typeDev     = "dev"
@@ -308,7 +308,7 @@ func readmeURL(m *release.Manifest) string {
 // readVersionSection 读取更新日志并摘出指定版本的小节
 //
 // 文件不存在不是错误而是"没有可摘内容"：很多仓库在首个版本发布前还没有 CHANGELOG，
-// 此时应走"未找到小节"的兜底提示，而不是让整个命令失败
+// 此时应走"未找到小节"的默认提示，而不是让整个命令失败
 func readVersionSection(root, file, version string) (string, bool, error) {
 	buf, err := os.ReadFile(filepath.Join(root, file))
 	if err != nil {

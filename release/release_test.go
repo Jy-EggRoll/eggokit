@@ -157,7 +157,7 @@ func TestValidate(t *testing.T) {
 }
 
 // TestAssetName 锁定产物命名规则：<前缀>-<os>-<arch>，windows 追加 .exe
-// 这是与既有项目（flk）反复核对过的形态，改动会让老用户升级失败，因此单独用表驱动钉死
+// 这是与既有项目（flk）反复核对过的形态，改动会让老用户升级失败，因此单独用表驱动固定
 func TestAssetName(t *testing.T) {
 	m := validManifest()
 
@@ -270,7 +270,7 @@ func TestValidateReleaseNotesLang(t *testing.T) {
 	}
 }
 
-// TestChangelogPathFor 锁定"按语言取日志文件"的解析规则与兜底
+// TestChangelogPathFor 锁定"按语言取日志文件"的解析规则与默认值
 func TestChangelogPathFor(t *testing.T) {
 	m := &Manifest{
 		ChangelogFile: "docs/NEWS.md",

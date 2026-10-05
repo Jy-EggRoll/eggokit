@@ -118,7 +118,7 @@ func New(cfg Config) (*Updater, error) {
 		cfg.SlowThreshold = defaultSlowThreshold
 	}
 	if cfg.HTTPClient == nil {
-		// http.DefaultClient 没有任何超时，服务端不响应时请求会永久挂起，这里必须显式兜底
+		// http.DefaultClient 没有任何超时，服务端不响应时请求会永久挂起，这里必须显式设置超时
 		cfg.HTTPClient = &http.Client{Timeout: 30 * time.Second}
 	}
 	if cfg.ExecutablePath == nil {

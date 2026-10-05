@@ -49,7 +49,7 @@ type Manifest struct {
 	// LDFLAGSPackage 是版本注入目标的包路径，必填，如 github.com/jy-eggroll/flk/cmd
 	// 构建时通过 -X <包>.Version=... 与 -X <包>.BuildTime=... 注入
 	//
-	// 有两条容易踩的坑：包路径写错不会报错，只会让版本号静默停留在零值；
+	// 有两条容易出错的地方：包路径写错不会报错，只会让版本号静默停留在零值；
 	// 且它必须指向声明 Version/BuildTime 的**那个包**——若这两个变量声明在 main 包里，
 	// 链接器符号名是 "main.Version" 而非模块路径，写全导入路径同样会静默失效，
 	// 因此惯例是把它们放在一个非 main 的包（如 cmd）里再引用
@@ -62,7 +62,7 @@ type Manifest struct {
 	// ChangelogFile 是更新日志文件的文件名，相对项目根，留空时用 DefaultChangelogFile
 	// 保留可配置是为了兼容把日志放在 docs/ 之类位置的仓库，但绝大多数项目直接用默认值
 	//
-	// 它是 ChangelogFiles 各语言的兜底：某个语言在 ChangelogFiles 里没有专属文件时用这一份
+	// 它是 ChangelogFiles 各语言的默认值：某个语言在 ChangelogFiles 里没有专属文件时用这一份
 	ChangelogFile string `json:"changelogFile,omitempty"`
 
 	// ChangelogFiles 是按语言的更新日志文件映射（语言标签 -> 相对项目根的文件路径），可空
@@ -218,7 +218,7 @@ func (m *Manifest) Supports(goos, goarch string) bool {
 // ChangelogPath 返回更新日志相对项目根的文件名，未配置时回退默认值
 //
 // 做成方法而不是在 Load 里改写字段：默认值属于"读取时的语义"，直接写回结构体会让
-// 调用方无法分辨"清单里明确写了 CHANGELOG.md"与"清单没写、由本包兜底"
+// 调用方无法分辨"清单里明确写了 CHANGELOG.md"与"清单没写、由本包给出默认"
 func (m *Manifest) ChangelogPath() string {
 	if strings.TrimSpace(m.ChangelogFile) == "" {
 		return DefaultChangelogFile

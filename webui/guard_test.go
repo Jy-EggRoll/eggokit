@@ -16,7 +16,7 @@ import (
 //
 // 这组用例整体移植自既有实现（flk/cmd/serve_guard_test.go），只做了最小适配：
 // 原实现把三道防线写在同一个 guard 里，本包为在 Host 校验与写请求校验之间插入 token 门禁
-// 把它拆成 hostGuard + writeGuard，用例因此显式写出两者的组合顺序
+// 把它分成 hostGuard + writeGuard，用例因此显式写出两者的组合顺序
 
 // guardTestHandler 返回一个把「是否被放行」记录到 hit 上的终端 handler
 // 用 hit 而不是状态码判定：guard 拒绝时返回 403，放行时由本 handler 返回 200，两者都通过 recorder 观察
@@ -192,7 +192,7 @@ func (r *repeatedByteReader) Read(p []byte) (int, error) {
 
 // TestGuardRequestBodyLimit 校验 body 上限：声明长度的超大请求被 413 拒绝，
 // 未声明长度的超大请求在读取时被 MaxBytesReader 截断，正常大小的请求体原样透传
-// 防的回归：移除上限后，单个请求就能吃掉任意内存
+// 防的回归：移除上限后，单个请求就能占用任意内存
 func TestGuardRequestBodyLimit(t *testing.T) {
 	const host = "127.0.0.1:8999"
 

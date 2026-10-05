@@ -1,7 +1,7 @@
-// webui 提供「本机 WebUI 服务」的公共基础设施：监听与端口策略、Host/Origin/token 三道访问护栏、
+// webui 提供「本机 WebUI 服务」的公共基础设施：监听与端口策略、Host/Origin/token 三道访问校验、
 // 静态资源托管（内容哈希 ETag）、可选自动拉起浏览器，以及一份可供调用方自行打印的启动摘要
 //
-// 为什么值得单独成一个包：这类服务在多个命令行工具里各写了一遍，护栏细节各自漂移（有的没有
+// 为什么值得单独成一个包：这类服务在多个命令行工具里各写了一遍，校验细节各自漂移（有的没有
 // Host 校验、有的用字符串比较 token、有的用 http.FileServer 托管 embed.FS 于是条件请求悄悄
 // 失效），而风险完全一致——WebUI 通常能操作文件系统或改写业务数据，DNS rebinding + CSRF
 // 就等于任意文件删除
@@ -324,7 +324,7 @@ func (s *Server) route(w http.ResponseWriter, r *http.Request) {
 		//
 		// 为什么必须单独一条：首页文件在静态资源里还有一个真实名字（通常是 index.html），
 		// 而静态资源一律放行，于是 /index.html 会绕过 token 把首页交出去。首页通常不含机密，
-		// 但它往往带着运行期状态，这条旁路一旦成立，日后任何「往首页塞运行期数据」的改动
+		// 但它往往带着运行期状态，这条旁路一旦成立，日后任何「往首页写运行期数据」的改动
 		// 都会变成无凭据可读。按 404 而不是重定向到 "/"：重定向会把请求送回受保护路径，
 		// 等于用 302 告诉探测者「这个文件存在且受保护」
 		http.NotFound(w, r)
@@ -477,7 +477,7 @@ func (s *Server) assets() fs.FS {
 //
 // 常见类型写死在表里而不是全靠 mime.TypeByExtension：后者读的是系统 mime.types，
 // 在最小化的容器镜像里可能缺失，届时 css 会退化成 text/plain。这里只对调用方最常用的
-// 类型做保证，其余交给 mime 库兜底，最后再退到二进制流
+// 类型做保证，其余交给 mime 库判断，最后再退到二进制流
 // 显式带上 charset 是刻意的：css 与 js 里若含中文，缺少 charset 时浏览器会按本地编码猜
 func contentTypeFor(name string) string {
 	switch strings.ToLower(filepath.Ext(name)) {

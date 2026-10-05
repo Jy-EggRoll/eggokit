@@ -39,7 +39,7 @@ import "` + testPkg + `"
 `
 }
 
-// TestScanIgnoresBareT 断言裸 T(...) 不算消息调用。
+// TestScanIgnoresBareT 断言不带包选择器的 T(...) 不算消息调用。
 //
 // 这是"只认显式选择器"的直接后果，也是它带来的最大好处：别的包里同名函数或
 // 泛型类型参数（如 func Map[I any, T any] 里的 T）不会被误判成消息调用，
@@ -62,7 +62,7 @@ var _ = T("looks like a message but is not")
 		t.Fatalf("扫描失败: %v", err)
 	}
 	if len(res.Messages) != 0 {
-		t.Errorf("裸 T(...) 不应被识别为消息调用，实得 %d 条: %+v", len(res.Messages), res.Messages)
+		t.Errorf("不带包选择器的 T(...) 不应被识别为消息调用，实得 %d 条: %+v", len(res.Messages), res.Messages)
 	}
 }
 
@@ -202,8 +202,8 @@ func TestScanSkipsTestFiles(t *testing.T) {
 
 // TestScanIgnoresTypeParamT 断言泛型类型参数 T 不会被误当成消息函数。
 //
-// 这条其实已由"只认选择器"覆盖，但它是历史上真实踩过的坑（worker 包的
-// func Map[I any, T any] 曾让裸 T 匹配方案产生误报），留作回归测试。
+// 这条其实已由"只认选择器"覆盖，但它是历史上真实出现过的问题（worker 包的
+// func Map[I any, T any] 曾让直接匹配 T 的方案产生误报），留作回归测试。
 func TestScanIgnoresTypeParamT(t *testing.T) {
 	root := t.TempDir()
 	writeGo(t, root, "cmd/x.go", `package cmd

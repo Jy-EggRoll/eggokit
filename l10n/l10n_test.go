@@ -112,7 +112,7 @@ func TestExtraLayerMayOmitLanguage(t *testing.T) {
 	if err := Init(testOther, opts); err != nil {
 		t.Fatalf("附加层缺少 de.json 时 Init 不应失败: %v", err)
 	}
-	// 库里没有该语言的译文时回落源串，而不是空串或裸 id
+	// 库里没有该语言的译文时回落源串，而不是空串或未翻译的 id
 	if got := T("Open", nil); got != "Open" {
 		t.Errorf("库消息无译文时 T(Open) = %q, want 源串 Open", got)
 	}
@@ -159,7 +159,7 @@ func TestTranslateInterpolatesTemplateData(t *testing.T) {
 
 // TestTranslateFallsBackToSourceText 验证两类降级都回落到源串。
 //
-// 这是"源串即 id"模型的关键性质：**任何漏翻都不会产生空串或裸 key**，
+// 这是"源串即 id"模型的关键性质：**任何漏翻都不会产生空串或未翻译的 key**，
 // 最差情况只是显示源串。因此这里断言的正是"等于源串"而不是"报错"。
 func TestTranslateFallsBackToSourceText(t *testing.T) {
 	if err := Init(testDefault, testOptions(t)); err != nil {
@@ -319,7 +319,7 @@ func TestSetLanguageSwitchesWithoutReloading(t *testing.T) {
 // TestSetLanguageConcurrentWithTranslators 是本次改造的核心门禁，必须配合 -race 运行。
 //
 // 回归背景：切换语言曾经只能靠重启进程，包级 localizer/current 被当作"Init 之后只读"，
-// 于是运行期切换必然会与并发中的 T() 竞争这两个裸指针（实测报 Write at l10n.go:70
+// 于是运行期切换必然会与并发中的 T() 竞争这两个无保护的指针（实测报 Write at l10n.go:70
 // vs Read at l10n.go:83）。改成 atomic 快照后，本用例用多读者 + 多写者的方式持续施压：
 //   - 8 个读者各自反复调用 T / Current / Supported（模拟 worker 并发翻译）
 //   - 2 个写者在两种语言之间反复切换

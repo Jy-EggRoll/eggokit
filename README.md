@@ -13,7 +13,7 @@ eggokit 是 [Jy-EggRoll](https://github.com/Jy-EggRoll) 的 Go 通用基础库�
 | `logger` | 基于标准库 `log/slog` 的分级日志，级别可运行时切换，供诊断与审计使用 |
 | `updater` | 自升级：查询 GitHub Release、下载并校验 SHA-256 摘要、跨平台替换可执行文件（含 Windows 原地改名交接） |
 | `release` | 发版工具链的公共部分：发布清单（平台列表与产物命名）与两个命令 `buildall`、`changelog` |
-| `webui` | 本机 WebUI 服务的公共基础设施：端口策略、Host/Origin/token 三道访问护栏、带内容哈希 ETag 的静态资源托管与启动摘要（只返回字符串，由调用方决定怎么输出） |
+| `webui` | 本机 WebUI 服务的公共基础设施：端口策略、Host/Origin/token 三道访问校验、带内容哈希 ETag 的静态资源托管与启动摘要（只返回字符串，由调用方决定怎么输出） |
 
 各包的具体约定写在各自的包注释里，改代码前先读那里。
 

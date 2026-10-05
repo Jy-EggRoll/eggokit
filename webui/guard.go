@@ -11,13 +11,13 @@ import (
 	"github.com/jy-eggroll/eggokit/l10n"
 )
 
-// 本文件为「本机 WebUI 服务」提供统一的访问护栏
+// 本文件为「本机 WebUI 服务」提供统一的访问校验
 //
 // 背景：这类服务的 HTTP 端点此前既无鉴权，也无 Host 校验、Origin/Referer 校验、
 // CSRF 防护与 body 大小限制，绑定地址还能设成 0.0.0.0 而不给任何提示。
 // 端点只接收 JSON 时，跨站请求难以伪造出有效载荷，风险还算可控；一旦 WebUI 具备
 // 「真正操作文件系统」的能力（建立链接 / 修复 / 解除链接，或改写调用方的业务数据文件），
-// DNS rebinding + CSRF 就等于任意文件删除，因此护栏属于必须先落地的前提
+// DNS rebinding + CSRF 就等于任意文件删除，因此这套校验属于必须先落地的前提
 //
 // 四道防线及其分工（外层先执行）：
 //  1. Host 校验（hostGuard，对所有请求）：请求的 Host 必须落在显式白名单内——内置的回环地址、
@@ -114,7 +114,7 @@ func writeGuard(h http.Handler) http.Handler {
 // （静态资源）一律放行——它们是公开的前端代码，若也要求 token，页面加载 <link>/<script>
 // 时无法附加查询参数，前端必须把 token 写进每个资源 URL，徒增耦合且没有安全收益
 //
-// 读取顺序是「查询参数优先、请求头兜底」：首屏是浏览器地址栏直接发起的导航请求，
+// 读取顺序是「查询参数优先、请求头回退」：首屏是浏览器地址栏直接发起的导航请求，
 // 除了 URL 没有别的地方能携带凭据；首屏之后前端改用请求头（见 tokenHeaderName）
 //
 // 比较必须用 crypto/subtle.ConstantTimeCompare：普通字符串比较会在第一个不同的字节处
@@ -146,7 +146,7 @@ func tokenGate(h http.Handler, token string) http.Handler {
 //
 // 刻意只认 "/" 与 "/api/" 前缀：
 //   - "/" 是精确匹配，页面入口本身受保护
-//   - 只有 "/api/" 带斜杠的形式才算 API；裸 "/api" 不是任何已注册的路由（会落到静态资源
+//   - 只有 "/api/" 带斜杠的形式才算 API；不带斜杠的 "/api" 不是任何已注册的路由（会落到静态资源
 //     查找或 404），把它纳入保护只会让「静态资源一律放行」这条规则出现例外
 //
 // 潜在影响点：路径用 path.Clean 归一之后再判定，因此 "/./api/config"、"/api/../api/config"
@@ -233,7 +233,7 @@ func isLoopbackHost(host string) bool {
 //
 // 判定顺序与理由：
 //  1. 有 Origin 就以它为准：浏览器对跨站写请求必定带上 Origin，页面脚本无法伪造它
-//  2. Origin 缺失但有 Referer 时用 Referer 兜底：少数老旧客户端不发 Origin
+//  2. Origin 缺失但有 Referer 时用 Referer 回退：少数老旧客户端不发 Origin
 //  3. 两者都没有则放行：非浏览器客户端（curl / 脚本）不适用 CSRF 模型，
 //     也不携带任何浏览器凭据，挡下来只会误伤本地工具
 //
@@ -260,7 +260,7 @@ func sameOriginRequest(r *http.Request) bool {
 // 与 normalizeHost 的唯一区别是端口：normalizeHost 刻意丢掉端口，因为白名单是按主机名授权的
 // （用户不会因为换了个端口就重新授权一次）；而同源比较必须保留端口，否则本机另一个端口上的页面
 // 会被判成与自己同源。两者不能合并成一份实现，这一点是刻意的
-// 不带端口时退回 normalizeHost：裸 IPv6 写法（[::1]）会走这条路径，方括号在那里被去掉
+// 不带端口时退回 normalizeHost：IPv6 写法（[::1]）会走这条路径，方括号在那里被去掉
 func normalizeAuthority(raw string) string {
 	trimmed := strings.TrimSpace(raw)
 	if trimmed == "" {

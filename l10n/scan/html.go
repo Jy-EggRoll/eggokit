@@ -391,7 +391,7 @@ type jsObject struct {
 // parseObject 解析一个字面量对象，s.i 必须指向 '{'。
 //
 // key 一律要求带引号：带引号的 key 是"这里明确声明了一条消息"的唯一形态，
-// 裸标识符 key 只可能出现在别的地方，认下来就会把借用的对象误当翻译表。
+// 不带引号的标识符 key 只可能出现在别的地方，认下来就会把借用的对象误当翻译表。
 func (s *jsScanner) parseObject() (*jsObject, error) {
 	text := s.src.text
 	if s.i >= len(text) || text[s.i] != '{' {

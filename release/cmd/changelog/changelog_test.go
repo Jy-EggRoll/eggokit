@@ -264,9 +264,9 @@ func TestRenderReleaseMissingSection(t *testing.T) {
 			if !strings.Contains(got, "## 主要更新内容") {
 				t.Fatalf("正式版必须带主要更新内容标题：\n%s", got)
 			}
-			// 兜底提示必须点名版本与文件，读者据此才知道该去哪里补
+			// 默认提示必须点名版本与文件，读者据此才知道该去哪里补
 			if !strings.Contains(got, tc.version) || !strings.Contains(got, "CHANGELOG.md") {
-				t.Fatalf("兜底提示应包含版本号与文件名：\n%s", got)
+				t.Fatalf("默认提示应包含版本号与文件名：\n%s", got)
 			}
 			// 关键断言：标题下方不能只是空白
 			if strings.Contains(got, "## 主要更新内容\n\n## 详细提交记录") {
@@ -442,7 +442,7 @@ func TestRenderChangelogFilesByLanguage(t *testing.T) {
 	}
 }
 
-// TestRenderMissingSectionReportsActualFile 锁定兜底提示必须点名"实际读取的那个文件"
+// TestRenderMissingSectionReportsActualFile 锁定默认提示必须点名"实际读取的那个文件"
 //
 // 多语言项目里日志文件名随语言而变，若固定报 CHANGELOG.md，用户会去改一个根本没被读到的文件
 func TestRenderMissingSectionReportsActualFile(t *testing.T) {
@@ -463,7 +463,7 @@ func TestRenderMissingSectionReportsActualFile(t *testing.T) {
 	})
 
 	if !strings.Contains(got, "CHANGELOG.en.md") {
-		t.Fatalf("兜底提示应点名实际读取的 CHANGELOG.en.md：\n%s", got)
+		t.Fatalf("默认提示应点名实际读取的 CHANGELOG.en.md：\n%s", got)
 	}
 }
 

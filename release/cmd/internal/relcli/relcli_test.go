@@ -4,7 +4,7 @@ import "testing"
 
 // TestDefaultLanguageIsEnglish 锁定内置默认语言为英文
 //
-// 这是本次行为的核心改动之一：默认语言从 zh-CN 改为 en。此处单独钉死，
+// 这是本次行为的核心改动之一：默认语言从 zh-CN 改为 en。此处单独固定，
 // 避免日后有人"顺手改回中文"而没有任何测试拦下
 func TestDefaultLanguageIsEnglish(t *testing.T) {
 	if DefaultLanguage != "en" {
@@ -15,7 +15,7 @@ func TestDefaultLanguageIsEnglish(t *testing.T) {
 // TestResolveLanguage 锁定语言优先级：命令行 > 清单 > 内置默认
 //
 // 三个来源都可能留空，优先级一旦写反就会出现"命令行指定了语言却不生效"这类难查问题，
-// 因此把全部分支用表驱动一次钉死
+// 因此把全部分支用表驱动一次固定
 func TestResolveLanguage(t *testing.T) {
 	cases := []struct {
 		name         string

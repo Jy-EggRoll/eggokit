@@ -216,7 +216,7 @@ func collectUnwrapped(fset *token.FileSet, file *ast.File, wrapped map[token.Pos
 
 // isMessageCall 判断一次调用是否是消息调用：形如 <别名>.T(...) 的选择器调用。
 //
-// 只认这一种形态。裸 T(...) 不算——否则别的包里的同名函数或类型参数（如泛型函数
+// 只认这一种形态。不带包选择器的 T(...) 不算——否则别的包里的同名函数或类型参数（如泛型函数
 // 的类型参数 T）会被误判成消息调用，而那种误判会随无关重构随时冒出来。
 func isMessageCall(call *ast.CallExpr, alias string) bool {
 	fun, ok := call.Fun.(*ast.SelectorExpr)
