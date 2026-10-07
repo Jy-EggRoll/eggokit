@@ -225,10 +225,7 @@ func Resolve(id string) (*Resolved, error) {
 		return nil, err
 	}
 
-	t := Type(declared)
-	if t != Dark && t != Light {
-		t = inferType(colors)
-	}
+	t, _ := themeType(declared, colors)
 	base, err := defaultsFor(t)
 	if err != nil {
 		return nil, err
@@ -370,8 +367,10 @@ func peek(src fsys, rel, group string) (Theme, error) {
 	}
 	// 认不出是主题的文件不算主题：调用方自己的配置文件常常就放在同一个目录里，
 	// 它既没有 name 也没有 colors
+	// 这条只用于诊断，Available 的两处调用都是 err == nil 才收，错误到不了用户，
+	// 所以保持原文、不走 l10n：会到达用户的文案才有词条的必要
 	if doc.Name == "" && doc.Include == "" && len(doc.Colors) == 0 {
-		return Theme{}, errors.New(l10n.T("not a theme file (no name/include/colors)", nil))
+		return Theme{}, errors.New("not a theme file (no name/include/colors)")
 	}
 
 	builtin := false
@@ -384,13 +383,33 @@ func peek(src fsys, rel, group string) (Theme, error) {
 	if name == "" {
 		name = strings.TrimSuffix(filepath.Base(rel), ".json")
 	}
-	t := Type(doc.Type)
-	if t != Dark && t != Light {
-		// 主题文件大多不写 type，这里只能按它自己声明的背景色推断；
-		// 连背景色都没有的（比如只写了 include 的那几层）就等真正解析时再定
-		t = inferType(doc.Colors)
+	t, ok := themeType(doc.Type, doc.Colors)
+	if !ok {
+		// 本文件判不出深浅（只写了 include 的那几层就是这样），沿 include 链取合并后的颜色再判。
+		// peek 与 Resolve 对同一个主题必须给同一个答案，否则按 Type 分组或筛选深浅的调用方会拿到
+		// 错的结果——light_plus 只写 include，此前在列表里是 dark，Resolve 却是 light。
+		// 链上有错（成环、越出目录、读不到）就保持上面判不出来的回退结果，不把错误抛出去：
+		// 一份坏主题不该让整份主题列表消失（见 Available 的说明）
+		if merged, mergedType, _, err := loadChain(src, rel, map[string]bool{}); err == nil {
+			t, _ = themeType(mergedType, merged)
+		}
 	}
 	return Theme{ID: id, Name: name, Type: t, Builtin: builtin, Group: group}, nil
+}
+
+// themeType 判定主题的深浅，peek 与 Resolve 共用这一条路径。
+// 先看主题链声明的 type（VSCode 的主题文件几乎都不写，它写在扩展的 package.json 里），
+// 认不出来再按颜色表推断。颜色表里连背景色都没有时返回 ok=false，由调用方决定
+// 是否再去取 include 链上合并后的颜色——两处各写一遍判断，正是 light_plus 那类主题
+// 在两处接口上给出不同深浅的原因
+func themeType(declared string, colors map[string]string) (Type, bool) {
+	if t := Type(declared); t == Dark || t == Light {
+		return t, true
+	}
+	if colors["editor.background"] == "" && colors["sideBar.background"] == "" {
+		return Dark, false
+	}
+	return inferType(colors), true
 }
 
 // inferType 在主题没有声明 type 时按背景色亮度推断深浅。

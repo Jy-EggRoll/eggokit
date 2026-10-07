@@ -230,6 +230,52 @@ func TestAvailable(t *testing.T) {
 	}
 }
 
+// TestAvailableTypeMatchesResolve 列表里的深浅必须与真正解析出来的深浅一致。
+//
+// 这是接口间的不变式：Available 只读单个文件，Resolve 还会沿 include 链合并颜色，
+// 于是只写 include、自身没有颜色的主题两处就会分叉——light_plus 只写 include，
+// 曾经在列表里是 dark、Resolve 却是 light。将来谁再把判断拆成两处，这条会立刻失败
+func TestAvailableTypeMatchesResolve(t *testing.T) {
+	list := Available(nil)
+	if len(list) == 0 {
+		t.Fatal("取不到任何内置主题")
+	}
+	for _, th := range list {
+		r, err := Resolve(th.ID)
+		if err != nil {
+			t.Errorf("%s：Resolve 失败：%v", th.ID, err)
+			continue
+		}
+		t.Logf("%-42s Available=%-5s Resolve=%-5s", th.ID, th.Type, r.Type)
+		if th.Type != r.Type {
+			t.Errorf("%s 的深浅不一致：Available 给出 %s，Resolve 给出 %s", th.ID, th.Type, r.Type)
+		}
+	}
+}
+
+// TestAvailableKeepsThemeWithBrokenInclude include 链有错的用户主题仍要列进清单，
+// 只是深浅退回按本文件判断：一个坏主题不该让整份主题列表消失（见 Available 的说明）
+func TestAvailableKeepsThemeWithBrokenInclude(t *testing.T) {
+	dir := t.TempDir()
+	write(t, filepath.Join(dir, "looping.json"), `{"name":"Looping","include":"./looping.json"}`)
+	write(t, filepath.Join(dir, "escaping.json"), `{"name":"Escaping","include":"../outside.json"}`)
+
+	list := Available([]string{dir})
+	byName := make(map[string]Theme, len(list))
+	for _, th := range list {
+		byName[th.Name] = th
+	}
+	for _, name := range []string{"Looping", "Escaping"} {
+		th, ok := byName[name]
+		if !ok {
+			t.Fatalf("%s 应当仍在列表里", name)
+		}
+		if th.Type != Dark {
+			t.Errorf("%s 判不出深浅时应回退到 %s，实际 %s", name, Dark, th.Type)
+		}
+	}
+}
+
 func write(t *testing.T, path, content string) {
 	t.Helper()
 	if err := os.WriteFile(path, []byte(content), 0o600); err != nil {

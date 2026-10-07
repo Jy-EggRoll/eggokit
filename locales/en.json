@@ -114,7 +114,6 @@
   "Version to inject into the binary (default: a local timestamp)": "Version to inject into the binary (default: a local timestamp)",
   "Warning: {{.Message}}": "Warning: {{.Message}}",
   "[View the full changes from {{.Previous}} to {{.Version}}]({{.URL}})": "[View the full changes from {{.Previous}} to {{.Version}}]({{.URL}})",
-  "not a theme file (no name/include/colors)": "not a theme file (no name/include/colors)",
   "releaseNotesLang {{.Value}} is not a supported language; supported languages are: {{.Supported}}": "releaseNotesLang {{.Value}} is not a supported language; supported languages are: {{.Supported}}",
   "theme id must be a builtin id or an absolute path: \"{{.ID}}\"": "theme id must be a builtin id or an absolute path: \"{{.ID}}\"",
   "theme {{.Path}}: include cycle detected": "theme {{.Path}}: include cycle detected",
