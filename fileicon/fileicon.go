@@ -25,8 +25,12 @@ package fileicon
 
 import (
 	"embed"
+	"encoding/json"
 	"errors"
 	"io/fs"
+	"sort"
+	"strings"
+	"sync"
 )
 
 // assets 与包放在一起、路径固定：资源在编译期打进二进制，调用方不需要额外分发文件
@@ -45,6 +49,64 @@ func Assets() fs.FS {
 		panic("fileicon: 嵌入资源缺少 assets 目录: " + err.Error())
 	}
 	return sub
+}
+
+// Palette 返回图标主题里出现过的每一档字体颜色（小写、形如 #rrggbb，去重后升序）。
+//
+// 为什么调用方需要它：Seti 给每种文件类型配了色，而那个色是照着编辑器的底色挑的，
+// 落到宿主自己的底色上未必读得出。宿主事先不知道某个文件会命中哪一档，但可以拿着
+// 这份清单逐档判一遍，只把读不出的那几档按色号覆盖掉——一刀切换成同一个色会把
+// 类型色全抹平。
+//
+// 深色档与浅色档两份平行表取并集：客户端按系统偏好挑其中一份，服务端并不知道会挑
+// 哪一份，所以两边都要覆盖到。
+func Palette() []string {
+	paletteOnce.Do(func() { palette = loadPalette() })
+	return palette
+}
+
+var (
+	paletteOnce sync.Once
+	palette     []string
+)
+
+// loadPalette 从嵌入的图标主题里收集每一个 fontColor。
+//
+// 整体遍历而不是按字段名逐层取：这份主题的层级在 seti 上游版本之间变过，
+// 而凡是写成 fontColor 的值都可能落到图标上，按结构取会漏掉
+func loadPalette() []string {
+	raw, err := fs.ReadFile(assets, "assets/fileicon/seti-icon-theme.json")
+	if err != nil {
+		return nil
+	}
+	var doc any
+	if err := json.Unmarshal(raw, &doc); err != nil {
+		return nil
+	}
+	seen := make(map[string]struct{})
+	var walk func(v any)
+	walk = func(v any) {
+		switch t := v.(type) {
+		case map[string]any:
+			if s, ok := t["fontColor"].(string); ok && s != "" {
+				seen[strings.ToLower(s)] = struct{}{}
+			}
+			for _, x := range t {
+				walk(x)
+			}
+		case []any:
+			for _, x := range t {
+				walk(x)
+			}
+		}
+	}
+	walk(doc)
+	out := make([]string, 0, len(seen))
+	for c := range seen {
+		out = append(out, c)
+	}
+	sort.Strings(out)
+	return out
 }
 
 // Overlay 把嵌入资源叠在调用方自己的静态资源之下：own 优先，own 缺的文件回退给嵌入资源。

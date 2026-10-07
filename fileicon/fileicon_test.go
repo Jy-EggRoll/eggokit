@@ -179,6 +179,47 @@ func TestFontCharacters(t *testing.T) {
 	}
 }
 
+// TestPalette 色号清单必须等于图标定义里出现过的每一个 fontColor，且每一项都能直接
+// 当 CSS 类名的一段用（小写、形如 #rrggbb、不带别的字符）。
+//
+// 调用方是拿着这份清单逐档判对比度、再按色号拼 CSS 规则的：清单漏一档，那一档图标就
+// 永远得不到兜底；写法不合法，规则拼出来匹配不上，覆盖会静默失效——两件事一起锁住。
+//
+// 这里用结构化解析（iconDefinitions）去对实现里的整体遍历：两条路径互相独立，对上了
+// 才说明清单完整。深色档与浅色档的定义同在这一个表里，因此两档色值都在其中
+func TestPalette(t *testing.T) {
+	theme := loadTheme(t)
+	want := map[string]bool{}
+	for _, def := range theme.IconDefinitions {
+		if def.FontColor != "" {
+			want[strings.ToLower(def.FontColor)] = true
+		}
+	}
+	got := Palette()
+	if len(want) == 0 {
+		t.Fatal("图标定义里一个 fontColor 都没有，这条测试没在验证任何东西")
+	}
+	if len(got) != len(want) {
+		t.Errorf("色号清单有 %d 档，图标定义里有 %d 档", len(got), len(want))
+	}
+	re := regexp.MustCompile(`^#[0-9a-f]{6}$`)
+	for _, c := range got {
+		if !re.MatchString(c) {
+			t.Errorf("色号 %q 不能直接当类名的一段用（要求小写 #rrggbb）", c)
+		}
+		if !want[c] {
+			t.Errorf("色号 %q 不在图标定义里", c)
+		}
+		delete(want, c)
+	}
+	for c := range want {
+		t.Errorf("图标定义里的色号 %q 没进清单，那一档图标会得不到兜底", c)
+	}
+	if second := Palette(); len(second) != len(got) {
+		t.Errorf("两次调用给出了不同的清单：%d 档 vs %d 档", len(second), len(got))
+	}
+}
+
 // TestOverlay 覆盖叠层的四种结果：own 命中、回退到嵌入资源、两边都没有、非法路径名
 func TestOverlay(t *testing.T) {
 	own := fstest.MapFS{

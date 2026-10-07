@@ -185,9 +185,21 @@
     return String(p || '').split(/[\\/]/).filter(Boolean).pop() || '';
   }
 
+  // tintSlot 把色值化成类名里的一段：去掉开头的 # 并转小写。
+  //
+  // 契约的另一半在宿主侧——宿主按同样的写法拼出 CSS 规则去覆盖读不出的那几档色，
+  // 两边写法必须一致，不一致这套覆盖会静默失效（宿主侧也应有一条端到端断言盯着它）
+  function tintSlot(hex) {
+    return String(hex).replace(/^#/, '').toLowerCase();
+  }
+
   // iconHTML 生成文件类型图标的 HTML。
   // 颜色用图标文档里的 fontColor（Seti 为每种类型配了色），因此图标颜色是“类型色”，
   // 与文件名、状态字母的“状态色”互不干扰——这正是 VSCode 里的观感
+  //
+  // 除了内联色，还额外带一个色号类名（形如 seti-cbcb41）：类型色是照编辑器底色挑的，
+  // 落到宿主自己的底色上未必读得出。宿主可以借着这个类名**只覆盖读不出的那几档**，
+  // 而不是把 .seti 一刀切盖成同一种颜色——那样会把类型色全抹平
   function iconHTML(path) {
     const map = prefersLight.matches ? iconLight : iconDark;
     if (!map) return '';
@@ -200,8 +212,9 @@
     const def = map.defs[id];
     const ch = iconGlyph(def);
     if (!ch) return '';
+    const tint = def.fontColor ? ' seti-' + tintSlot(def.fontColor) : '';
     const color = def.fontColor ? ' style="color:' + esc(def.fontColor) + '"' : '';
-    return '<i class="seti"' + color + '>' + esc(ch) + '</i>';
+    return '<i class="seti' + tint + '"' + color + '>' + esc(ch) + '</i>';
   }
 
   function clearCache() {
