@@ -1,0 +1,30 @@
+/*
+ * Seti 图标字体：@font-face 的名字与 seti-icon-theme.json 里 fonts[].id 一致，
+ * 字形通过 font-character 私有区码位引用，见 seti.js 的 iconGlyph
+ *
+ * font-display: block 而不是 swap：类型图标在第一次绘制时缺席会表现为文件名短暂左移，
+ * 而图标字体是本地资源、拿到的代价极低，闪一下比位移更好
+ *
+ * 字体用相对 URL，靠样式表自身的 URL 解析：这样 fileicon/ 挂在哪一级路径下都不用改这里
+ */
+@font-face {
+  font-family: "seti";
+  src: url("seti.woff") format("woff");
+  font-weight: normal;
+  font-style: normal;
+  font-display: block;
+}
+
+/*
+ * 文件类型图标：Seti 字体里的私有区字形。尺寸略大于文字（VSCode 图标主题的
+ * fonts[].size 为 150%），并关闭字体回退，避免缺字形时显示成方框
+ */
+.seti {
+  flex: none;
+  font-family: "seti", monospace;
+  font-size: 150%;
+  line-height: 1;
+  font-style: normal;
+  width: 16px;
+  text-align: center;
+}
