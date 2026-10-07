@@ -10,14 +10,28 @@
  *
  * 对外只暴露一个全局对象，其余状态收在闭包里，避免污染调用方的全局作用域：
  *   window.fileicon.ready            两份 JSON 就绪的 Promise，永远不会 reject
- *   window.fileicon.iconHTML(path)   取某个路径的类型图标 HTML，未就绪或查不到时给空串
+ *   window.fileicon.iconHTML(path)   取某个路径的类型图标 HTML；返回空串只有三种情况：
+ *                                    未就绪、两份 JSON 加载失败、图标定义的 fontCharacter
+ *                                    非法或缺失。除此之外即使没命中任何文件类型，也会回退到
+ *                                    图标主题的 map.file（默认文件图标），给出的是非空的
+ *                                    <i class="seti" ...>。也就是说返回值非空不等于命中了文件类型，
+ *                                    调用方若要区分，得另找依据，不能只看空串与否
  *   window.fileicon.clearCache()     清掉按文件名的查表缓存
  */
 (function () {
   'use strict';
 
-  // 本脚本在资源根下的固定路径，回退扫描 script 标签时用它做后缀匹配
-  const SELF_SUFFIX = 'fileicon/seti.js';
+  // 本脚本在资源根下的固定路径，回退扫描 script 标签时用它做匹配
+  const SELF_PATH = 'fileicon/seti.js';
+
+  // isSelfSrc 判断某个 script 的 src 是否就是本脚本。必须按路径分段匹配：
+  // 只做后缀匹配的话，myfileicon/seti.js 这类路径也会被误当成自己。
+  // 查询串先剥掉，src="fileicon/seti.js?token=abc&x=1" 这种带参数的加载方式才算得上
+  function isSelfSrc(src) {
+    if (!src) return false;
+    const p = src.replace(/[?#].*$/, '');
+    return p === SELF_PATH || p.endsWith('/' + SELF_PATH);
+  }
 
   // selfURL 取本脚本的绝对 URL。document.currentScript 在异步注入、模块化或某些
   // 框架的加载方式下会是 null，此时退化为从后往前扫描 script[src]，找以固定路径结尾的那个
@@ -27,7 +41,7 @@
     const list = document.getElementsByTagName('script');
     for (let i = list.length - 1; i >= 0; i--) {
       const src = list[i].src || '';
-      if (src.endsWith(SELF_SUFFIX)) return src;
+      if (isSelfSrc(src)) return src;
     }
     return '';
   }
@@ -47,9 +61,26 @@
 
   // 主题切换时自行清缓存：调用方只负责重画，不需要知道缓存的存在，
   // 否则深浅两套表切换后会沿用旧表查出的图标 id
-  prefersLight.addEventListener('change', function () {
+  //
+  // 这里的注册必须容错，原因不在缓存本身：Safari 13 及更早、旧 Edge 的 MediaQueryList
+  // 只有已废弃的 addListener，没有 addEventListener（Safari 14 才补上），直接调用会抛
+  // TypeError；而这段代码位于本文件末尾 window.fileicon = ... 之前，一旦抛错，导出语句
+  // 根本不会执行——后果是整个文件类型图标功能消失，不是单纯漏清一次缓存。
+  // 回退路径：先特性检测用 addEventListener，缺失时退回 addListener；两者都没有（理论上
+  // 不该出现）只记一条警告，缓存不再随主题切换清空，绝不影响下面的导出。
+  function onSchemeChange() {
     clearCache();
-  });
+  }
+
+  try {
+    if (prefersLight.addEventListener) {
+      prefersLight.addEventListener('change', onSchemeChange);
+    } else {
+      prefersLight.addListener(onSchemeChange);
+    }
+  } catch (err) {
+    console.warn('fileicon: cannot watch color scheme changes, icon cache will not be cleared on theme switch: ' + err.message);
+  }
 
   // 自带一个最小的 HTML 转义，不依赖调用方页面里的同名工具函数
   function esc(s) {

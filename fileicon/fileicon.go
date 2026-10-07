@@ -57,6 +57,10 @@ func Assets() fs.FS {
 //   - 但 fs.ReadDir 之类的目录枚举只反映 own 自己（或回退到嵌入资源）的那一层内容，
 //     不会把两边同一目录下的条目合并起来。想对外暴露完整的目录清单，得自己合并。
 //
+// 还要注意 overlayFS 只实现了 Open，没有实现 fs.ReadDirFS / fs.ReadFileFS / fs.StatFS，
+// 用类型断言走捷径的调用方（fsys.(fs.ReadFileFS) 这类）会拿到“未实现”，得改用通用函数：
+// fs.ReadFile、fs.Stat、fs.ReadDir 在没有对应可选接口时会回退到 Open，因此照常可用。
+//
 // own 为 nil 时等价于直接使用 Assets()。
 func Overlay(own fs.FS) fs.FS {
 	if own == nil {
