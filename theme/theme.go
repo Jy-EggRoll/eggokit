@@ -93,7 +93,9 @@ var builtinFS embed.FS
 //	editor.background                                    src/vs/platform/theme/common/colors/baseColors.ts
 //	foreground / descriptionForeground                   src/vs/platform/theme/common/colors/baseColors.ts
 //	focusBorder                                          src/vs/platform/theme/common/colors/baseColors.ts
-//	list.hoverBackground                                 src/vs/platform/theme/common/colors/listColors.ts
+//	list.hoverBackground / list.activeSelection*         src/vs/platform/theme/common/colors/listColors.ts
+//	                                                     选中态那对是一组：底色深、前景白。只抄底色
+//	                                                     会让深灰字压在蓝底上读不出来（实测 1.01:1）
 //	badge.background / badge.foreground                  src/vs/platform/theme/common/colors/miscColors.ts
 //	button.* / dropdown.* / input.*                      src/vs/platform/theme/common/colors/inputColors.ts
 //	editorWidget.background                              src/vs/platform/theme/common/colors/editorColors.ts
