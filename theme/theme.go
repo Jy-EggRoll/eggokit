@@ -34,6 +34,8 @@ import (
 	"path/filepath"
 	"sort"
 	"strings"
+
+	"github.com/jy-eggroll/eggokit/l10n"
 )
 
 // DefaultDarkID / DefaultLightID 是“跟随系统深浅”时用的两套内置主题。
@@ -213,7 +215,7 @@ func Resolve(id string) (*Resolved, error) {
 		src, rel = embedSource{}, strings.TrimPrefix(id, builtinPrefix)
 	} else {
 		if !filepath.IsAbs(id) {
-			return nil, fmt.Errorf("theme id must be a builtin id or an absolute path: %q", id)
+			return nil, errors.New(l10n.T("theme id must be a builtin id or an absolute path: \"{{.ID}}\"", map[string]any{"ID": id}))
 		}
 		src, rel = diskSource{}, id
 	}
@@ -309,7 +311,7 @@ type themeDoc struct {
 // 而这类错误光看堆栈很难看出是主题文件的问题
 func loadChain(src fsys, rel string, seen map[string]bool) (map[string]string, string, string, error) {
 	if seen[rel] {
-		return nil, "", "", fmt.Errorf("theme %s: include cycle detected", rel)
+		return nil, "", "", errors.New(l10n.T("theme {{.Path}}: include cycle detected", map[string]any{"Path": rel}))
 	}
 	seen[rel] = true
 
@@ -334,7 +336,7 @@ func loadChain(src fsys, rel string, seen map[string]bool) (map[string]string, s
 		// 里面的 include 若是 ../../x.json 这种路径，就等于让本包按它去读系统上任意文件。
 		// 官方与 Catppuccin 的主题 include 的都是同目录下的兄弟文件，这条限制不会误伤
 		if !withinDir(path.Dir(rel), inc) {
-			return nil, "", "", fmt.Errorf("theme %s: include escapes its own directory: %q", rel, doc.Include)
+			return nil, "", "", errors.New(l10n.T("theme {{.Path}}: include escapes its own directory: \"{{.Include}}\"", map[string]any{"Path": rel, "Include": doc.Include}))
 		}
 		base, baseType, _, err := loadChain(src, inc, seen)
 		if err != nil {
@@ -369,7 +371,7 @@ func peek(src fsys, rel, group string) (Theme, error) {
 	// 认不出是主题的文件不算主题：调用方自己的配置文件常常就放在同一个目录里，
 	// 它既没有 name 也没有 colors
 	if doc.Name == "" && doc.Include == "" && len(doc.Colors) == 0 {
-		return Theme{}, errors.New("not a theme file (no name/include/colors)")
+		return Theme{}, errors.New(l10n.T("not a theme file (no name/include/colors)", nil))
 	}
 
 	builtin := false

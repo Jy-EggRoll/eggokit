@@ -114,7 +114,11 @@
   "Version to inject into the binary (default: a local timestamp)": "Version to inject into the binary (default: a local timestamp)",
   "Warning: {{.Message}}": "Warning: {{.Message}}",
   "[View the full changes from {{.Previous}} to {{.Version}}]({{.URL}})": "[View the full changes from {{.Previous}} to {{.Version}}]({{.URL}})",
+  "not a theme file (no name/include/colors)": "not a theme file (no name/include/colors)",
   "releaseNotesLang {{.Value}} is not a supported language; supported languages are: {{.Supported}}": "releaseNotesLang {{.Value}} is not a supported language; supported languages are: {{.Supported}}",
+  "theme id must be a builtin id or an absolute path: \"{{.ID}}\"": "theme id must be a builtin id or an absolute path: \"{{.ID}}\"",
+  "theme {{.Path}}: include cycle detected": "theme {{.Path}}: include cycle detected",
+  "theme {{.Path}}: include escapes its own directory: \"{{.Include}}\"": "theme {{.Path}}: include escapes its own directory: \"{{.Include}}\"",
   "{{.Count}} platform(s) declared in the manifest are not shown in the download table and would be silently missing from the release notes: {{.List}}": "{{.Count}} platform(s) declared in the manifest are not shown in the download table and would be silently missing from the release notes: {{.List}}",
   "{{.Count}} platform(s) failed: {{.List}}": "{{.Count}} platform(s) failed: {{.List}}",
   "| Architecture | Windows | Linux | macOS | FreeBSD |": "| Architecture | Windows | Linux | macOS | FreeBSD |"

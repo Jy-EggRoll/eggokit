@@ -114,7 +114,11 @@
   "Version to inject into the binary (default: a local timestamp)": "注入二进制的版本号（默认使用本地时间戳）",
   "Warning: {{.Message}}": "警告: {{.Message}}",
   "[View the full changes from {{.Previous}} to {{.Version}}]({{.URL}})": "[查看 {{.Previous}} 到 {{.Version}} 的完整变更]({{.URL}})",
+  "not a theme file (no name/include/colors)": "不是主题文件（没有 name、include、colors 中的任何一项）",
   "releaseNotesLang {{.Value}} is not a supported language; supported languages are: {{.Supported}}": "releaseNotesLang {{.Value}} 不是受支持的语言，受支持的语言为: {{.Supported}}",
+  "theme id must be a builtin id or an absolute path: \"{{.ID}}\"": "主题 id 必须是内置 id 或绝对路径: \"{{.ID}}\"",
+  "theme {{.Path}}: include cycle detected": "主题 {{.Path}}: 检测到 include 成环",
+  "theme {{.Path}}: include escapes its own directory: \"{{.Include}}\"": "主题 {{.Path}}: include 越出了自身所在目录: \"{{.Include}}\"",
   "{{.Count}} platform(s) declared in the manifest are not shown in the download table and would be silently missing from the release notes: {{.List}}": "清单声明的 {{.Count}} 个平台未出现在下载表格中，发布说明里会静默遗漏: {{.List}}",
   "{{.Count}} platform(s) failed: {{.List}}": "{{.Count}} 个平台构建失败: {{.List}}",
   "| Architecture | Windows | Linux | macOS | FreeBSD |": "| 架构 | Windows | Linux | macOS | FreeBSD |"

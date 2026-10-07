@@ -206,7 +206,7 @@ func TestResolveRejectsNonPath(t *testing.T) {
 // 认不出是主题的 JSON（同目录里调用方自己的配置文件）必须被跳过
 func TestAvailable(t *testing.T) {
 	dir := t.TempDir()
-	write(t, filepath.Join(dir, "ggt-config.json"), `{"language":"zh-CN","parent_paths":["/x"]}`)
+	write(t, filepath.Join(dir, "config.json"), `{"language":"zh-CN","parent_paths":["/x"]}`)
 	write(t, filepath.Join(dir, "zebra.json"), `{"name":"Zebra","type":"dark","colors":{"foreground":"#fff"}}`)
 	write(t, filepath.Join(dir, "alpha.json"), `{"name":"Alpha","type":"light","colors":{"foreground":"#000"}}`)
 	write(t, filepath.Join(dir, "broken.json"), `{"name": `)
