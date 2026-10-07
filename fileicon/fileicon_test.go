@@ -111,7 +111,7 @@ func TestThemeLookups(t *testing.T) {
 	}
 	for _, tb := range tables {
 		if tb.l.File == "" {
-			t.Errorf("%s表缺少兜底图标 file", tb.name)
+			t.Errorf("%s表缺少默认图标 file", tb.name)
 		}
 		for _, part := range []struct {
 			name string
