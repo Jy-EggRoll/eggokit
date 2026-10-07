@@ -16,8 +16,10 @@ var shadowCases = []struct {
 }{
 	// 主题自己写了全透明阴影，卡片等于是没有阴影
 	{"vscode/2026-light.json", "#00000000", "#FFFFFF", true},
-	// 底色近黑（最大通道 20），可暗化空间小，只能靠抬透明度达标
-	{"vscode/2026-dark.json", "#0000005c", "#121314", true},
+	// 底色近黑（最大通道 20），可暗化空间小。改前用固定门槛 10 时它被判不达标、会被压深；
+	// 换成比例门槛 20/7≈2.9 后它的 7.2 级已经算达标，于是不再被动——这是本次判据修订
+	// 唯一一处翻转，且方向是“少改”，见本文件末尾的 TestEnsureShadowLeavesNearBlackAlone
+	{"vscode/2026-dark.json", "#0000005c", "#121314", false},
 	// 这三套没写 widget.shadow，走注册表浅色默认值，差 41 级，必须一个字节都不变
 	{"vscode/light_plus.json", "#00000029", "#FFFFFF", false},
 	{"vscode/light_vs.json", "#00000029", "#FFFFFF", false},
@@ -102,12 +104,15 @@ func TestEnsureShadowParsesNothing(t *testing.T) {
 	}
 }
 
-// TestEnsureShadowNoHeadroom 全黑底色的可暗化空间为零，此时不该无限折腾，
-// 但要如实报告“动过”（阴影色确实被压到了能做的最好一档）
+// TestEnsureShadowNoHeadroom 全黑底色算出的门槛是 0 级，也就是“什么都不用做”：
+// 纯黑上再压深也压不出任何差值，此时唯一正确的做法是原样交回主题给的值
 func TestEnsureShadowNoHeadroom(t *testing.T) {
-	got, _ := EnsureShadow("#00000029", "#000000")
+	got, changed := EnsureShadow("#00000029", "#000000")
 	if d := ShadowDiff(got, "#000000"); d != 0 {
 		t.Errorf("全黑底色上竟算出 %v 级差，颜色 %s", d, got)
+	}
+	if changed || got != "#00000029" {
+		t.Errorf("全黑底色上不该改动阴影，得到 %s，%v", got, changed)
 	}
 }
 
@@ -124,5 +129,50 @@ func TestShadowDiffOnDefaults(t *testing.T) {
 		if got := ShadowDiff(c.shadow, c.bg); math.Abs(got-c.want) > 0.05 {
 			t.Errorf("ShadowDiff(%s, %s) = %v，期望 %v", c.shadow, c.bg, got, c.want)
 		}
+	}
+}
+
+// TestShadowFloorIsProportional 把“门槛 = 底色最大通道 / 7”这条判据本身钉住。
+//
+// 比例是这次修订的核心：门槛必须随底色亮度走，且不能被调高到动到浅色默认值。
+// 这里同时验两头——门槛等于 max/7，以及被用户接受的那两档默认阴影都在门槛之上
+func TestShadowFloorIsProportional(t *testing.T) {
+	for _, c := range []struct {
+		bg   string
+		want float64
+	}{
+		{"#FFFFFF", 255.0 / 7}, // 浅色：门槛 36.4，浅色默认差 41，不动
+		{"#1E1E1E", 30.0 / 7},  // dark_plus：门槛 4.3，默认差 10.8，不动
+		{"#1F1F1F", 31.0 / 7},  // dark_modern：门槛 4.4，默认差 11.2，不动
+		{"#000000", 0},         // 纯黑：没有任何可暗化空间，门槛 0
+	} {
+		if got := minShadowDiffFor(mustParse(t, c.bg)); math.Abs(got-c.want) > 1e-9 {
+			t.Errorf("minShadowDiffFor(%s) = %v，期望 %v", c.bg, got, c.want)
+		}
+	}
+
+	// 比例取 1/7 时浅色门槛是 36.4，浅色默认的 41 还高出门槛 4.6 级；若取 1/6，门槛升到
+	// 42.5，反而高过 41，官方浅色主题就会被改掉。所以 7 是这条比例还能取的最小分母
+	d := ShadowDiff("#00000029", "#FFFFFF")
+	if d < minShadowDiffFor(mustParse(t, "#FFFFFF")) {
+		t.Errorf("浅色默认差 %v 级，已低于当前门槛，说明两档默认值本身变过", d)
+	}
+	if 255.0/6 <= d {
+		t.Errorf("1/6 比例的门槛 %v 并未超过浅色默认差 %v，本用例对分母下界的说明需要重写", 255.0/6, d)
+	}
+}
+
+// TestEnsureShadowLeavesNearBlackAlone 近黑底色是这次修订唯一改变结论的一类：
+// 2026-dark 的底色 #121314 最大通道只有 20，阴影差 7.2 级。
+// 旧判据（固定 10 级）把它判成不达标、要压深；新判据的门槛是 20/7≈2.9，
+// 7.2 级已经算达标，于是它必须原样保留。这里钉住这个翻转，防止有人把旧行为改回来
+func TestEnsureShadowLeavesNearBlackAlone(t *testing.T) {
+	const shadow, bg = "#0000005c", "#121314"
+	got, changed := EnsureShadow(shadow, bg)
+	if changed || got != shadow {
+		t.Errorf("近黑底色 %s 上的阴影 %s 被改成 %s（改动=%v），按比例门槛不该动", bg, shadow, got, changed)
+	}
+	if d := ShadowDiff(shadow, bg); d < minShadowDiffFor(mustParse(t, bg)) {
+		t.Errorf("近黑底色上的实际差 %v 级已低于门槛，那它就该被改，本用例的前提不成立", d)
 	}
 }

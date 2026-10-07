@@ -16,24 +16,20 @@ import (
 	"math"
 )
 
-// MinShadowDiff 是判定“阴影看得见”的门槛：合成后与底色的最大单通道差，单位是 0-255 的灰阶。
+// shadowDiffPerChannel 是门槛与底色的比例：门槛 = 底色最大通道 / 7，单位是 0-255 的灰阶。
 //
-// 10 级这个数是量出来的：注册表默认值（浅色 16% 黑、深色 36% 黑）压在各自底色上的实际差是
-// 41 级与 11 级，两档都是正常可辨的观感；而 4-7 级那几套主题实测在屏幕上就是看不见。
-// 因此门槛取在两者之间偏下处，够低到不改变“正常阴影”的观感，够高到能把看不见的挑出来
-const MinShadowDiff = 10.0
-
-// nearBlackMaxChannel 是“近黑底色”的判定线：底色最大通道低于它时，可暗化空间本来就小。
+// 为什么不再用一个固定的 10 级：同一个 10 级差在浅色底与近黑底上的含义完全不同。
+// 底色越浅，可暗化的绝对空间越大，“10 级”只占其中很小一段，压在 #FFFFFF 上的 16% 黑
+// 实际有 41 级差、观感正常，10 级门槛对浅色几乎不设防；底色越黑，整块空间只有几十级，
+// 同一个 10 级已经接近“把阴影压成纯黑”才能换来的量，于是 2026-dark 这种底色最大通道
+// 只有 20 的主题会被反复压深却仍然过不了线。改成按底色比例给门槛，两侧才是同一把尺子。
 //
-// 比如 2026-dark 的底色 #121314 最大通道只有 20，纯黑以它自己的透明度压上去最多只能差
-// 0.36*20≈7 级，怎么压深都到不了 10 级——这种情况门槛按底色最大通道减半，留一半余量，
-// 并允许继续抬透明度（抬透明度不改变色调，是暗色主题下唯一还能挤出差值的手段）
-//
-// 这条线只用来“放宽”，绝不“收紧”：门槛取 max/2 与统一门槛中更小的那个。
-// 否则底色最大通道落在 20-31 之间时减半反而会把门槛抬到 10 以上——官方 dark_plus 底色
-// #1e1e1e（最大通道 30）本来差 10.8 级、观感正常，会被判成不够而白白改掉，
-// 那就成了“顺手把所有主题都改了”，与“达标的必须原样渲染”相冲突
-const nearBlackMaxChannel = 32.0
+// 7 这个数不是取的整数好看，是按当前被用户接受的默认阴影反推的下界：浅色默认 #00000029
+// 压 #FFFFFF 得 41 级，而 255/7≈36.4 < 41；深色默认 #0000005c 压 #1e1e1e、#1f1f1f 得
+// 10.8 与 11.2 级，而 30/7≈4.3、31/7≈4.4。三档都留有余量，所以“本来达标的主题”在新
+// 判据下一个字节都不会变。比例再往上调（比如除以 6）就会开始动到浅色默认值，
+// 那等于顺手改掉官方主题的观感——见 theme/shadow_test.go 里钉住这几套的用例
+const shadowDiffPerChannel = 7.0
 
 // ShadowDiff 返回阴影色按 alpha 合成到底色上之后、与底色的最大单通道差（0-255）。
 //
@@ -54,13 +50,13 @@ func ShadowDiff(shadow, bg string) float64 {
 	return math.Max(math.Abs(fb.r-b.r), math.Max(math.Abs(fb.g-b.g), math.Abs(fb.b-b.b)))
 }
 
-// minShadowDiffFor 按底色算出该用的门槛：近黑底色减半，其余用统一门槛
+// minShadowDiffFor 按底色亮度算出该用的门槛：底色最大通道每 7 级换 1 级门槛。
+//
+// 全黑底色算出 0 级门槛，也就是“什么都算达标”，这是对的：纯黑上再压深也压不出任何差值
+// （ShadowDiff 必然为 0），此时唯一能做的就是别去改主题给的值
 func minShadowDiffFor(bg rgba) float64 {
 	max := math.Max(bg.r, math.Max(bg.g, bg.b))
-	if max < nearBlackMaxChannel {
-		return math.Min(MinShadowDiff, max/2)
-	}
-	return MinShadowDiff
+	return max / shadowDiffPerChannel
 }
 
 // EnsureShadow 在阴影色与底色差得看不见时调整阴影色，返回调整后的颜色与“是否真的调过”。
@@ -92,18 +88,32 @@ func EnsureShadow(shadow, bg string) (string, bool) {
 		return math.Max(math.Abs(fb.r-b.r), math.Max(math.Abs(fb.g-b.g), math.Abs(fb.b-b.b)))
 	}
 
+	// 判据要对着**真正发出去的那个色值**判，不能对中途的浮点值判。
+	// 输出是 8 位十六进制，每个通道都要取整，取整后的差可能比浮点值小零点几级；
+	// 实测 Catppuccin mocha 的候选浮点差刚过门槛 6.571，写下取整后只剩 6.525，
+	// 于是“单测说达标、页面上其实没过线”。这里统一先落成十六进制、解析回来再判，
+	// 保证单测与页面看到的是同一个数
+	emit := func(c rgba) (string, float64) {
+		out := c.hex()
+		q, ok := parseColor(out)
+		if !ok {
+			return out, diff(c)
+		}
+		return out, diff(q)
+	}
+
 	// 第一段：保持色相、饱和度与透明度不变，明度按 1% 步进压向全黑，命中即停。
 	// 步进而不是一次算到位，为的是“尽可能少改”——主题原本的深浅关系还在
 	best := s
 	bestDiff := diff(s)
 	for step := 1; step <= 100; step++ {
 		cand := fromHSL(h, sat, l*(1-float64(step)/100)).withAlpha(s.a)
-		d := diff(cand)
+		out, d := emit(cand)
 		if d > bestDiff {
 			best, bestDiff = cand, d
 		}
 		if d >= min {
-			return cand.hex(), true
+			return out, true
 		}
 	}
 
@@ -115,15 +125,17 @@ func EnsureShadow(shadow, bg string) (string, bool) {
 	for step := 1; step <= 100; step++ {
 		a := s.a + (1-s.a)*float64(step)/100
 		cand := best.withAlpha(a)
-		d := diff(cand)
+		out, d := emit(cand)
 		if d > bestDiff {
 			best, bestDiff = cand, d
 		}
 		if d >= min {
-			return cand.hex(), true
+			return out, true
 		}
 	}
 
-	// 走到尽头都没达标：底色是全黑（没有任何可暗化空间），交出能做到的最好一档并如实报告“动过”
-	return best.hex(), true
+	// 走到尽头都没达标：交出能做到的最好一档并如实报告“动过”。
+	// 只有底色接近全黑、确实挤不出差值时才会走到这里（门槛此时本身就接近 0）
+	out, _ := emit(best)
+	return out, true
 }
