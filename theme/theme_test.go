@@ -234,7 +234,7 @@ func TestAvailable(t *testing.T) {
 //
 // 这是接口间的不变式：Available 只读单个文件，Resolve 还会沿 include 链合并颜色，
 // 于是只写 include、自身没有颜色的主题两处就会分叉——light_plus 只写 include，
-// 曾经在列表里是 dark、Resolve 却是 light。将来谁再把判断拆成两处，这条会立刻失败
+// 修复前它在列表里是 dark、Resolve 却是 light。将来谁再把判断分成两处，这条会立刻失败
 func TestAvailableTypeMatchesResolve(t *testing.T) {
 	list := Available(nil)
 	if len(list) == 0 {
