@@ -131,6 +131,9 @@ func ratio(fg, bg rgba) float64 {
 
 // Contrast 返回两色的 WCAG 对比度（1 到 21）。任一颜色解析不了时返回 0，
 // 调用方据此知道“这个值不该参与调整”
+//
+// 底色带透明度时这个函数给不出有意义的答案：它把底色当成不透明色算，而半透明色实际是深是浅
+// 取决于落在什么表面上。那种情形要先用 Over 合成出人眼真正看到的那一层颜色，再拿结果进来
 func Contrast(fg, bg string) float64 {
 	f, okF := parseColor(fg)
 	b, okB := parseColor(bg)
@@ -138,6 +141,25 @@ func Contrast(fg, bg string) float64 {
 		return 0
 	}
 	return ratio(f.over(b), b)
+}
+
+// Over 把 top 按自身透明度合成到 bottom 上，返回不透明色。
+//
+// 存在的理由是“半透明色单独看没有对比度可言”：它真实的观感取决于落在什么表面上。要判断一个
+// 半透明的前景或底色能不能读出来，必须先用它合成出人眼看到的那一层颜色，再拿去算比值。
+//
+// 把半透明底色当不透明色算会得出偏乐观的结论，这是实际发生过的：某主题的选中底色是
+// #00000025，字色 #757575，按“不透明黑底”算得 11.6:1，看着却几乎读不出来——它实际压在
+// 浅色表面上合成出一层浅灰雾，真实比值只有 3.3:1
+//
+// 任一方解析不了时原样返回 top：宁可不算，也不要拿一个没解析成功的颜色合成出一个新色值
+func Over(top, bottom string) string {
+	t, okTop := parseColor(top)
+	b, okBottom := parseColor(bottom)
+	if !okTop || !okBottom {
+		return top
+	}
+	return t.over(b).hex()
 }
 
 // EnsureContrast 在前景色与 bgs 里任一底色读不出来时，沿明度轴调整前景直到全部达标。
@@ -149,6 +171,10 @@ func Contrast(fg, bg string) float64 {
 //
 // 多个底色时按“最差的那一对”判定：按钮的前景既要压在常态底色上、也要压在 hover 底色上，
 // 两个都得达标才算达标
+//
+// 底色带透明度时，调用方必须先把它合成到实际落着的表面上（用 Over）再传进来：本函数不做
+// 这一步，因为它不知道那个表面是什么——那是调用方的页面知识。不合成就会漏判，见 Over 里
+// 记着的那个实例
 func EnsureContrast(fg string, bgs []string, min float64) (string, bool) {
 	f, ok := parseColor(fg)
 	if !ok {

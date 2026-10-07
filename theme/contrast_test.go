@@ -159,3 +159,78 @@ func TestRGBRoundTrip(t *testing.T) {
 		}
 	}
 }
+
+// registryPairs 是注册表里成对收录的“前景压在底色上”，一条测试锁住两件事。
+//
+// 一是必须成对收录：这类缺陷的真实形态就是只抄一半——list.activeSelectionBackground 抄了、
+// Foreground 没抄，于是同一份注册表在浅色档下发出去的是“深灰字压在蓝底上”（实测 1.01:1）。
+// 逐个令牌检查值的测试发现不了它，只有把一对拿出来算一次对比度才会暴露。
+//
+// 二是这一对本身要过 AA：注册表是给所有使用方的兜底值，兜底值自己就不达标，
+// 使用方再不做二次兜底就没人管了。
+//
+// 只收底色不透明的配对：keybindingLabel.* 那种底色本身就是半透明色，脱离它实际落在哪个
+// 表面上算不出有意义的比值，硬算只会得到一个假结论；那类靠使用方在自己的页面上兜底
+var registryPairs = []struct{ fg, bg string }{
+	{"list.activeSelectionForeground", "list.activeSelectionBackground"},
+	{"badge.foreground", "badge.background"},
+	{"button.foreground", "button.background"},
+	{"dropdown.foreground", "dropdown.background"},
+	{"input.foreground", "input.background"},
+}
+
+// TestRegistryPairsMeetAA 注册表里成对收录的配对必须齐全且过 AA
+func TestRegistryPairsMeetAA(t *testing.T) {
+	for _, ty := range []Type{Dark, Light} {
+		base, err := defaultsFor(ty)
+		if err != nil {
+			t.Fatal(err)
+		}
+		for _, p := range registryPairs {
+			fg, bg := base[p.fg], base[p.bg]
+			if fg == "" || bg == "" {
+				t.Errorf("%s：%s 与 %s 应当成对收录，实际 %q / %q", ty, p.fg, p.bg, fg, bg)
+				continue
+			}
+			if r := Contrast(fg, bg); r < MinContrast {
+				t.Errorf("%s：%s(%s) 压在 %s(%s) 上只有 %.2f:1，低于 AA 的 %.1f:1",
+					ty, p.fg, fg, p.bg, bg, r, MinContrast)
+			}
+		}
+	}
+}
+
+// TestOverCompositesOntoSurface 同一个半透明色压在不同表面上，得到的实际颜色不同——
+// 这正是“半透明底色不能当不透明色来算对比度”的根据
+func TestOverCompositesOntoSurface(t *testing.T) {
+	// 0x25 = 37，即 37/255 的黑，压在纯白上得 #dadada，压在纯黑上仍是黑的
+	if got := Over("#00000025", "#ffffff"); got != "#dadada" {
+		t.Errorf("37/255 的黑压在纯白上应为 #dadada，实际 %s", got)
+	}
+	if got := Over("#00000025", "#000000"); got != "#000000" {
+		t.Errorf("37/255 的黑压在纯黑上应仍是 #000000，实际 %s", got)
+	}
+	// 不透明的前景不受底色影响，只做格式归一
+	if got := Over("#0069cc", "#ffffff"); got != "#0069cc" {
+		t.Errorf("不透明前景应原样返回，实际 %s", got)
+	}
+	// 解析不了就原样返回，不猜
+	if got := Over("rgb(1,2,3)", "#ffffff"); got != "rgb(1,2,3)" {
+		t.Errorf("解析不了时应原样返回，实际 %s", got)
+	}
+}
+
+// TestContrastIgnoresBgAlpha 锁住 Contrast 在底色带透明度时的行为：它把底色当不透明色算，
+// 因此会低估问题的严重程度。这条测试不是认可这个结果，而是把“坑在这里”写进代码里——
+// 谁想改这个行为，得先看到上面 TestOverCompositesOntoSurface 说明的那件事
+func TestContrastIgnoresBgAlpha(t *testing.T) {
+	got := Contrast("#757575", "#00000025")
+	if got < MinContrast {
+		t.Fatalf("本条测试锁的是“按不透明黑底算会虚高”，实际算得 %.2f:1", got)
+	}
+	// 合成到浅色表面上之后才是真实值：压不住 AA
+	real := Contrast("#757575", Over("#00000025", "#ffffff"))
+	if real >= MinContrast {
+		t.Fatalf("合成到浅色表面上应当读不出来，实际算得 %.2f:1", real)
+	}
+}
