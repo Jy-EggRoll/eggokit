@@ -223,7 +223,10 @@ func EnsureContrast(fg string, bgs []string, min float64) (string, bool) {
 		if nl > 1 {
 			nl = 1
 		}
-		cand := fromHSL(h, s, nl).withAlpha(f.a)
+		// 判“最终会交出去的那个色值”，而不是明度刚算出来的中间值：hex() 会把通道
+		// 四舍五入，取整能让比值掉到线下（实测 Frappe 的领先徽章 4.49、dark_modern
+		// 悬停时的错误徽章 4.4997，都是判了中间值才“达标”的）
+		cand := roundedOf(fromHSL(h, s, nl).withAlpha(f.a))
 		r := worst(cand)
 		if r > bestRatio {
 			best, bestRatio = cand, r
@@ -234,6 +237,17 @@ func EnsureContrast(fg string, bgs []string, min float64) (string, bool) {
 	}
 	// 走到明度尽头都没达标（极端配色）：交出能做到的最好一档，并如实报告“动过”
 	return best.hex(), true
+}
+
+// roundedOf 把颜色按最终输出格式（hex 的四舍五入）定型再交回来。
+//
+// 判对比度时用它：调用方拿到的是十六进制文本，中间值那个颜色用户永远看不到，
+// 拿它判线就会出现“函数说达标、实际差一点”
+func roundedOf(c rgba) rgba {
+	if out, ok := parseColor(c.hex()); ok {
+		return out
+	}
+	return c
 }
 
 // toHSL 转到 HSL（h 0-360，s/l 0-1）。保留色相与饱和度是“微调”的关键：

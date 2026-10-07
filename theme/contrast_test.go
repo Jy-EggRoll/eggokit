@@ -119,6 +119,36 @@ func TestEnsureContrastContradictoryBackgrounds(t *testing.T) {
 	}
 }
 
+// TestEnsureContrastJudgesRoundedColor 判线判的是“最终交出去的那个色值”。
+//
+// hex() 会把通道四舍五入，取整后的比值可以比中间值低：只判中间值就会出现“函数说达标、
+// 实际差一点”。下面这些配对都是真实形状（浅色档的次要文字压在近白底上、深色档压在深底上、
+// 以及 Catppuccin Latte 那对读不出来的按钮），逐个要求交回来的色值真的达标
+func TestEnsureContrastJudgesRoundedColor(t *testing.T) {
+	bgs := []string{"#ffffff", "#f3f3f3", "#eff1f5", "#1e1e1e", "#181825", "#df8e1d"}
+	fgs := []string{"#e6e9ef", "#bfc0ca", "#6c6f85", "#717171", "#cbcb41", "#8dc149", "#dce0e8"}
+	checked := 0
+	for _, bg := range bgs {
+		for _, fg := range fgs {
+			if Contrast(fg, bg) >= MinContrast {
+				continue
+			}
+			out, changed := EnsureContrast(fg, []string{bg}, MinContrast)
+			if !changed {
+				t.Fatalf("%s 压在 %s 上只有 %.2f:1，应当被调整", fg, bg, Contrast(fg, bg))
+			}
+			checked++
+			if got := Contrast(out, bg); got < MinContrast {
+				t.Errorf("%s 压在 %s 上：交回的是 %s，实际只有 %.3f:1",
+					fg, bg, out, got)
+			}
+		}
+	}
+	if checked == 0 {
+		t.Error("没有一组配对进入断言，这条测试没在验证任何东西")
+	}
+}
+
 // TestEnsureContrastIgnoresUnparseable 解析不了的颜色原样返回：
 // 宁可放着不动，也不要拿一个没解析成功的颜色算出一个新色值
 func TestEnsureContrastIgnoresUnparseable(t *testing.T) {
