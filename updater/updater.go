@@ -27,6 +27,11 @@ const (
 
 	// ChannelDev 只考虑开发版标签，供希望提前验证的用户主动选择
 	ChannelDev
+
+	// ChannelAlpha 跟随滚动预发布：CI 每次推送 main 都覆盖同一个 Release 标签，
+	// 因此这里的标签没有版本号语义，只能靠 Release 正文里的构建标记判断新旧，
+	// 不能复用 ChannelDev 那种按版本号比较的逻辑
+	ChannelAlpha
 )
 
 // 默认参数：仅在 Config 未显式提供时生效，集中在此便于审查升级器的固有行为
@@ -39,6 +44,10 @@ const (
 
 	// defaultUserAgent 在宿主未指定时作为请求标识
 	defaultUserAgent = "self-updater"
+
+	// defaultAlphaTag 是滚动预发布默认使用的固定标签
+	// 与版本号标签分开，使 alpha 构建可以被整体删除或重建而不影响正式版与开发版
+	defaultAlphaTag = "alpha"
 )
 
 // Config 是升级器的全部外部依赖
@@ -55,6 +64,10 @@ type Config struct {
 
 	// Reporter 承接全部用户可见输出与确认，必填
 	Reporter Reporter
+
+	// AlphaTag 是滚动预发布使用的固定标签，为空时使用 "alpha"
+	// 该标签下的 Release 会被异步覆盖更新，因此不能按标签文本推断版本新旧
+	AlphaTag string
 
 	// APIEndpoint 是 API 根地址，用于对接 GitHub Enterprise 等自建实例
 	// 为空时使用 GitHub 公共 API；结尾多余的斜杠会被自动去除
@@ -111,6 +124,9 @@ func New(cfg Config) (*Updater, error) {
 	}
 	cfg.APIEndpoint = strings.TrimRight(cfg.APIEndpoint, "/")
 
+	if cfg.AlphaTag == "" {
+		cfg.AlphaTag = defaultAlphaTag
+	}
 	if cfg.UserAgent == "" {
 		cfg.UserAgent = defaultUserAgent
 	}
