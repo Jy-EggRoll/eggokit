@@ -34,7 +34,6 @@
   "Building {{.Platform}} -> {{.Asset}}": "Building {{.Platform}} -> {{.Asset}}",
   "Built {{.Platform}} in {{.Duration}}": "Built {{.Platform}} in {{.Duration}}",
   "Check for and upgrade to the latest version": "Check for and upgrade to the latest version",
-  "Check for and upgrade {{.Program}} to the latest version": "Check for and upgrade {{.Program}} to the latest version",
   "Check for builds from the rolling alpha prerelease": "Check for builds from the rolling alpha prerelease",
   "Check for development versions": "Check for development versions",
   "Checking for updates ({{.Channel}})...": "Checking for updates ({{.Channel}})...",

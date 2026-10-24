@@ -34,7 +34,6 @@
   "Building {{.Platform}} -> {{.Asset}}": "正在构建 {{.Platform}} -> {{.Asset}}",
   "Built {{.Platform}} in {{.Duration}}": "已完成 {{.Platform}}，耗时 {{.Duration}}",
   "Check for and upgrade to the latest version": "检查并升级到最新版本",
-  "Check for and upgrade {{.Program}} to the latest version": "检查并升级 {{.Program}} 到最新版本",
   "Check for builds from the rolling alpha prerelease": "检查 alpha 通道的滚动预发布构建",
   "Check for development versions": "检查开发版本",
   "Checking for updates ({{.Channel}})...": "正在检查更新（{{.Channel}}）...",

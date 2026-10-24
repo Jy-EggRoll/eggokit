@@ -128,8 +128,13 @@ func NewCommand(opts Options) *cobra.Command {
 	c := &cobra.Command{
 		Use:     "upgrade",
 		Aliases: []string{"update", "up"},
-		Short:   l10n.T("Check for and upgrade to the latest version", nil),
-		Long:    l10n.T("Check for and upgrade {{.Program}} to the latest version", map[string]any{"Program": opts.Program}),
+		Short: l10n.T("Check for and upgrade to the latest version", nil),
+		// 长说明刻意不带程序名：Short/Long 在构造命令时就求值，而有的宿主在语言包加载之前
+		// 就把命令树建好了（flk 如此），它保存的是此刻的英文串，语言加载后再拿这串查译文。
+		// 带程序名的模板会先渲染成 "…upgrade flk to…"，译文表里没有这条已渲染的句子，
+		// 于是回退英文，帮助首行就成了英文。用固定串换来任何构造时机都正确，
+		// 代价只是首行不再重复程序名（Use 里已经写了）
+		Long: l10n.T("Check for and upgrade to the latest version", nil),
 		RunE: func(cmd *cobra.Command, _ []string) error {
 			return run(cmd, opts)
 		},
