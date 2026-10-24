@@ -11,6 +11,7 @@ eggokit 是 [Jy-EggRoll](https://github.com/Jy-EggRoll) 的 Go 通用基础库�
 | `jsonfile` | JSON 序列化的统一口径（缩进、转义、结尾换行），保证写出的配置文件在版本控制里 diff 稳定 |
 | `atomicfile` | 原子写文件：同目录临时文件 + 落盘 + rename，避免写入中途失败留下半截文件 |
 | `logger` | 基于标准库 `log/slog` 的分级日志，级别可运行时切换，供诊断与审计使用 |
+| `upgradecli` | 升级命令：把各工具重复写的 `upgrade` 命令收敛成一份实现（通道选择、检查、确认、执行），宿主只提供仓库坐标、资产命名与版本来源 |
 | `updater` | 自升级：查询 GitHub Release、下载并校验 SHA-256 摘要、跨平台替换可执行文件（含 Windows 原地改名交接） |
 | `release` | 发版工具链的公共部分：发布清单（平台列表与产物命名）与两个命令 `buildall`、`changelog` |
 | `webui` | 本机 WebUI 服务的公共基础设施：端口策略、Host/Origin/token 三道访问校验、带内容哈希 ETag 的静态资源托管与启动摘要（只返回字符串，由调用方决定怎么输出） |
