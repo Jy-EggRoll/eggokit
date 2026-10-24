@@ -128,7 +128,7 @@ func NewCommand(opts Options) *cobra.Command {
 	c := &cobra.Command{
 		Use:     "upgrade",
 		Aliases: []string{"update", "up"},
-		Short: l10n.T("Check for and upgrade to the latest version", nil),
+		Short:   l10n.T("Check for and upgrade to the latest version", nil),
 		// 长说明刻意不带程序名：Short/Long 在构造命令时就求值，而有的宿主在语言包加载之前
 		// 就把命令树建好了（flk 如此），它保存的是此刻的英文串，语言加载后再拿这串查译文。
 		// 带程序名的模板会先渲染成 "…upgrade flk to…"，译文表里没有这条已渲染的句子，
@@ -195,6 +195,13 @@ func run(cmd *cobra.Command, opts Options) error {
 	reporter := updater.Reporter(updater.DiscardReporter())
 	if opts.Reporter != nil {
 		reporter = opts.Reporter(cmd)
+	}
+	// --yes 表示用户放弃的是全部交互确认，不只是“升级到新版本”这一次：
+	// 下载器在直连超时或失败时还会询问是否换用代理，那条询问同样走 Reporter.Confirm。
+	// 若只在下面跳过升级确认，这里就会在非交互环境下失败，还提示用户“请加 --yes”——
+	// 可他明明已经加了（实测遇到）。套一层一律同意的装饰，所有确认点在 --yes 下行为一致
+	if assumeYes {
+		reporter = autoYesReporter{Reporter: reporter}
 	}
 	tokenProvider := opts.TokenProvider
 	if tokenProvider == nil {
@@ -296,3 +303,15 @@ func run(cmd *cobra.Command, opts Options) error {
 	reporter.Success("%s", l10n.T("Upgrade complete; it takes effect after restarting {{.Program}}", map[string]any{"Program": opts.Program}))
 	return nil
 }
+
+// autoYesReporter 在 --yes 下把每一个确认点都当作已征得同意。
+//
+// 升级器内部不止一处确认：直连下载超时或失败时还会询问是否换用代理，那条询问与升级确认
+// 共用同一个 Reporter。因此只能在界面这一层统一处理，而不是在每个调用点各判一次——
+// 漏掉一处就会让加了 --yes 的用户仍然收到“请加 --yes”的矛盾提示
+type autoYesReporter struct {
+	updater.Reporter
+}
+
+// Confirm 不问问题，直接返回同意
+func (autoYesReporter) Confirm(string) (bool, error) { return true, nil }

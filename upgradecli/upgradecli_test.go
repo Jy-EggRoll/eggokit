@@ -404,6 +404,27 @@ func TestAssumeYesSkipsConfirmation(t *testing.T) {
 	}
 }
 
+// TestAutoYesReporterConfirmsEverything 断言 --yes 的装饰层覆盖升级器内部的其它确认点。
+//
+// 直连下载失败后“是否换用代理”的询问发生在 updater 内部，不经过命令层的跳过判断。
+// 若只在那里判断 --yes，用户会看到“请加 --yes 后重试”，而他明明已经加了——实测遇到过。
+// 这里直接断言装饰层：内层无论返回什么，一律视为同意，且问题不会被转给内层
+func TestAutoYesReporterConfirmsEverything(t *testing.T) {
+	inner := &fakeReporter{confirmErr: errors.New("非交互环境下无法确认")}
+	wrapped := autoYesReporter{Reporter: inner}
+
+	confirmed, err := wrapped.Confirm("直连下载失败，是否切换到代理下载？")
+	if err != nil {
+		t.Fatalf("--yes 下确认不应失败，实际 %v", err)
+	}
+	if !confirmed {
+		t.Fatal("--yes 下确认应返回同意")
+	}
+	if questions := inner.askedQuestions(); len(questions) != 0 {
+		t.Fatalf("装饰层不应把问题转给内层，实际 %q", questions)
+	}
+}
+
 // TestConfirmErrorAborts 断言确认环节出错时流程中止，且不会进入升级
 func TestConfirmErrorAborts(t *testing.T) {
 	server := newCountingServer(t, stableReleases(t, "v9.9.9"), nil, http.StatusOK)
