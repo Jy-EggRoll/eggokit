@@ -12,6 +12,7 @@ import (
 	"testing"
 
 	"github.com/jy-eggroll/eggokit/updater"
+	"github.com/spf13/cobra"
 )
 
 // fakeReporter 记录命令层与升级器之间的全部交互，并可控制确认点的结果。
@@ -201,7 +202,7 @@ func newTestCommand(t *testing.T, server *countingServer, reporter *fakeReporter
 		Target:        testTarget(),
 		Version:       func() string { return version },
 		BuildTime:     func() string { return "2026-01-01T00:00:00Z" },
-		Reporter:      func() updater.Reporter { return reporter },
+		Reporter:      func(*cobra.Command) updater.Reporter { return reporter },
 		TokenProvider: func() string { return "test-token" },
 		apiEndpoint:   server.URL,
 	}
@@ -470,5 +471,34 @@ func TestCommandShape(t *testing.T) {
 	// --yes 由宿主注册，共享命令不得自带，否则会与宿主的定义冲突或改变其作用域
 	if c.Flags().Lookup("yes") != nil {
 		t.Fatal("共享命令不应注册 --yes，该参数的作用域由宿主决定")
+	}
+}
+
+// TestReporterReceivesCommand 断言界面回调拿到的是正在执行的命令，
+// 宿主可以据此用 cmd.ErrOrStderr() 作为输出目标：测试替换了错误流，
+// 回调必须看到同一个流，否则宿主只能退回 os.Stderr 而破坏可测性
+func TestReporterReceivesCommand(t *testing.T) {
+	server := newCountingServer(t, stableReleases(t, "v9.9.9"), nil, http.StatusOK)
+	reporter := &fakeReporter{confirmAnswer: true}
+	opts := newTestCommand(t, server, reporter, "1.0.0", nil)
+
+	var gotErrStream, wantErrStream any
+	opts.Reporter = func(cmd *cobra.Command) updater.Reporter {
+		gotErrStream = cmd.ErrOrStderr()
+		return reporter
+	}
+
+	c := NewCommand(*opts)
+	errStream := new(strings.Builder)
+	c.SetOut(new(strings.Builder))
+	c.SetErr(errStream)
+	c.SetArgs([]string{"--check"})
+	wantErrStream = errStream
+
+	if err := c.Execute(); err != nil {
+		t.Fatalf("--check 不应失败: %v", err)
+	}
+	if gotErrStream != wantErrStream {
+		t.Fatalf("界面回调应拿到命令配置的错误流，实际 %v，期望 %v", gotErrStream, wantErrStream)
 	}
 }

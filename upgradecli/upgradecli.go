@@ -96,8 +96,14 @@ type Options struct {
 	BuildTime func() string
 
 	// Reporter 在命令执行时返回承接全部用户可见输出与确认的界面实现。
+	//
+	// 回调接收命令本身，是因为输出目标由命令决定：宿主通常用 cmd.ErrOrStderr()
+	// 作为写入目标，这样测试可以替换输出流，标准输出只承载业务数据。
+	// 这一取值属于宿主的界面层职责，共享命令不代为选择，否则宿主只能退回 os.Stderr
+	// 或绕开本包，两种做法都会改变既有行为。
+	//
 	// 为空时使用 updater.DiscardReporter，便于宿主在测试中免于实现界面
-	Reporter func() updater.Reporter
+	Reporter func(cmd *cobra.Command) updater.Reporter
 
 	// TokenProvider 返回 GitHub 令牌；为空时按环境变量查找
 	TokenProvider func() string
@@ -183,7 +189,7 @@ func run(cmd *cobra.Command, opts Options) error {
 	// reporter 承接升级器的全部用户可见输出与确认；令牌查找结果被升级器与下面的提示共用，只会真正查找一次
 	reporter := updater.Reporter(updater.DiscardReporter())
 	if opts.Reporter != nil {
-		reporter = opts.Reporter()
+		reporter = opts.Reporter(cmd)
 	}
 	tokenProvider := opts.TokenProvider
 	if tokenProvider == nil {
