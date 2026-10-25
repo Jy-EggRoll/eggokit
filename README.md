@@ -7,12 +7,13 @@ eggokit 是 [Jy-EggRoll](https://github.com/Jy-EggRoll) 的 Go 通用基础库�
 | 包 | 作用 |
 | --- | --- |
 | `l10n` | 轻量国际化。以英文源串作为消息 id，支持运行期切语言、整体原子快照、多来源语言层叠加，以及 CLI 与 HTML 页面文案的统一提取与校验 |
-| `locales` | 库自身文案（日志、升级）的语言文件，供下游通过 `l10n.Options.ExtraLayers` 叠加 |
+| `locales` | 库自身文案（日志、升级、版本信息）的语言文件，供下游通过 `l10n.Options.ExtraLayers` 叠加 |
 | `jsonfile` | JSON 序列化的统一口径（缩进、转义、结尾换行），保证写出的配置文件在版本控制里 diff 稳定 |
 | `atomicfile` | 原子写文件：同目录临时文件 + 落盘 + rename，避免写入中途失败留下半截文件 |
 | `logger` | 基于标准库 `log/slog` 的分级日志，级别可运行时切换，供诊断与审计使用 |
 | `upgradecli` | 升级命令：把各工具重复写的 `upgrade` 命令收敛成一份实现（通道选择、检查、确认、执行），宿主只提供仓库坐标、资产命名与版本来源 |
 | `updater` | 自升级：查询 GitHub Release、下载并校验 SHA-256 摘要、跨平台替换可执行文件（含 Windows 原地改名交接） |
+| `ui` | 终端界面：把 pterm 的升级进度、确认询问与 `version` 命令收敛成一份实现，宿主只注入 writer、程序名与版本来源 |
 | `release` | 发版工具链的公共部分：发布清单（平台列表与产物命名）与两个命令 `buildall`、`changelog` |
 | `webui` | 本机 WebUI 服务的公共基础设施：端口策略、Host/Origin/token 三道访问校验、带内容哈希 ETag 的静态资源托管与启动摘要（只返回字符串，由调用方决定怎么输出） |
 | `theme` | 解析 VSCode 主题文档：按「注册表默认值 → include 链 → 主题自身 colors」三层合并颜色表，内置八套官方与 Catppuccin 主题（逐字内嵌，含 MIT 许可），不预设调用方需要哪些颜色 id，全量返回由调用方按 id 自取 |
@@ -37,7 +38,7 @@ go run github.com/jy-eggroll/eggokit/release/cmd/changelog --manifest release.js
 
 ## 库自带的译文怎么用
 
-`logger` 与 `updater` 的文案由库自己提供译文。下游只要在自己的语言层之外多登记一层，这些文案就会随下游的语言一起切换，而不必把它们抄进自己的语言文件：
+`logger`、`updater`、`upgradecli` 与 `ui` 的文案由库自己提供译文。下游只要在自己的语言层之外多登记一层，这些文案就会随下游的语言一起切换，而不必把它们抄进自己的语言文件：
 
 ```go
 import (
