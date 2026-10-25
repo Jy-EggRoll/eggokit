@@ -16,7 +16,7 @@ eggokit 是 [Jy-EggRoll](https://github.com/Jy-EggRoll) 的 Go 通用基础库�
 | `ui` | 终端界面：把 pterm 的升级进度、确认询问与 `version` 命令收敛成一份实现，宿主只注入 writer、程序名与版本来源 |
 | `release` | 发版工具链的公共部分：发布清单（平台列表与产物命名）与两个命令 `buildall`、`changelog` |
 | `webui` | 本机 WebUI 服务的公共基础设施：端口策略、Host/Origin/token 三道访问校验、带内容哈希 ETag 的静态资源托管与启动摘要（只返回字符串，由调用方决定怎么输出） |
-| `theme` | 解析 VSCode 主题文档：按「注册表默认值 → include 链 → 主题自身 colors」三层合并颜色表，内置八套官方与 Catppuccin 主题（逐字内嵌，含 MIT 许可），不预设调用方需要哪些颜色 id，全量返回由调用方按 id 自取 |
+| `theme` | 解析 VSCode 主题文档：按「注册表默认值 → include 链 → 主题自身 colors」三层合并颜色表，内置八套 VSCode 官方主题与四套 Catppuccin 主题（逐字内嵌，含 MIT 许可），不预设调用方需要哪些颜色 id，全量返回由调用方按 id 自取 |
 
 各包的具体约定写在各自的包注释里，改代码前先读那里。
 
